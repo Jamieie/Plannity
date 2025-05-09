@@ -7,6 +7,8 @@ import org.mi.plannitybe.common.entity.base.BaseEntity;
 import org.mi.plannitybe.user.type.UserRoleType;
 import org.mi.plannitybe.user.type.UserStatusType;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "user")
 @Getter
@@ -48,11 +50,11 @@ public class User extends BaseEntity {
 
     @Column(length = 255)
     @Comment("가입일시")
-    private String registeredAt;
+    private LocalDateTime registeredAt;
 
     @Column(length = 255)
     @Comment("탈퇴일시")
-    private String deletedAt;
+    private LocalDateTime deletedAt;
 
     @Column(length = 255)
     @Comment("비고")
@@ -61,7 +63,7 @@ public class User extends BaseEntity {
     @Builder
     public User(String id, String email, String pwd, String nickname, String phoneNumber,
                UserRoleType role, String profileImage, UserStatusType status,
-               String registeredAt, String note) {
+               LocalDateTime registeredAt, String note) {
         this.id = id;
         this.email = email;
         this.pwd = pwd;
@@ -85,7 +87,7 @@ public class User extends BaseEntity {
         this.note = note;
     }
 
-    public void delete(String deletedAt) {
+    public void delete(LocalDateTime deletedAt) {
         this.deletedAt = deletedAt;
         this.status = UserStatusType.DELETED; // 상태도 함께 변경
     }
