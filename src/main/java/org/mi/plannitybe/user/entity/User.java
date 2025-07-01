@@ -1,5 +1,6 @@
 package org.mi.plannitybe.user.entity;
 
+import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Comment;
@@ -20,7 +21,7 @@ public class User extends BaseEntity {
     @Comment("사용자 ID")
     private String id;
 
-    @Column(length = 255)
+    @Column(length = 255, nullable = false)
     @Comment("이메일")
     private String email;
 
@@ -36,7 +37,7 @@ public class User extends BaseEntity {
     @Comment("전화번호")
     private String phoneNumber;
 
-    @Column(length = 20)
+    @Column(length = 20, nullable = false)
     @Comment("역할")
     private UserRoleType role;
 
@@ -44,7 +45,7 @@ public class User extends BaseEntity {
     @Comment("프로필 이미지")
     private String profileImage;
 
-    @Column(length = 20)
+    @Column(length = 20, nullable = false)
     @Comment("상태")
     private UserStatusType status;
 
