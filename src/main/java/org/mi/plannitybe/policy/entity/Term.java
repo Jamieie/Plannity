@@ -24,6 +24,8 @@ public class Term extends BaseEntity {
     @Comment("필수 동의 여부")
     private Boolean required;
 
+    // FIXME) TermType 필드 추가하기
+
     @Builder
     public Term(String name, Boolean required) {
         this.name = name;
