@@ -17,10 +17,10 @@ public abstract class BaseEntity extends BaseTimeEntity {
     @CreatedBy
     @Column(nullable = false, updatable = false, length = 100)
     @Comment("생성자")
-    private String createdBy;
+    protected String createdBy;
 
     @LastModifiedBy
     @Column(nullable = false, length = 100)
     @Comment("수정자")
-    private String updatedBy;
+    protected String updatedBy;
 }

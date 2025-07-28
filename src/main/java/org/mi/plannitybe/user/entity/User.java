@@ -5,10 +5,13 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Comment;
 import org.mi.plannitybe.common.entity.base.BaseEntity;
+import org.mi.plannitybe.schedule.entity.EventList;
 import org.mi.plannitybe.user.type.UserRoleType;
 import org.mi.plannitybe.user.type.UserStatusType;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "user")
@@ -61,10 +64,19 @@ public class User extends BaseEntity {
     @Comment("비고")
     private String note;
 
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<EventList> eventList = new ArrayList<>();
+
+    public void addEventList(EventList eventList) {
+        this.eventList.add(eventList);
+    }
+
     @Builder
     public User(String id, String email, String pwd, String nickname, String phoneNumber,
                UserRoleType role, String profileImage, UserStatusType status,
-               LocalDateTime registeredAt, String note) {
+               LocalDateTime registeredAt, String note,
+                String createdBy, String updatedBy,
+                List<EventList> eventList) {
         this.id = id;
         this.email = email;
         this.pwd = pwd;
@@ -75,9 +87,12 @@ public class User extends BaseEntity {
         this.status = status;
         this.registeredAt = registeredAt;
         this.note = note;
+        this.createdBy = createdBy;
+        this.updatedBy = updatedBy;
+        this.eventList = (eventList == null) ? new ArrayList<>() : eventList;
     }
 
-    public void update(String email, String nickname, String phoneNumber, 
+    public void update(String email, String nickname, String phoneNumber,
                       UserRoleType role, String profileImage, UserStatusType status, String note) {
         this.email = email;
         this.nickname = nickname;

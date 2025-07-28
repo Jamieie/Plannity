@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.mi.plannitybe.exception.EmailAlreadyExistsException;
 import org.mi.plannitybe.jwt.JwtToken;
 import org.mi.plannitybe.jwt.JwtTokenProvider;
+import org.mi.plannitybe.schedule.entity.EventList;
 import org.mi.plannitybe.user.dto.LoginRequest;
 import org.mi.plannitybe.user.dto.SignUpRequest;
 import org.mi.plannitybe.user.entity.User;
@@ -29,7 +30,6 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-//    private final AuthenticationManager authenticationManager;
     private final AuthenticationManagerBuilder authenticationManagerBuilder;
     private final JwtTokenProvider jwtTokenProvider;
 
@@ -44,21 +44,33 @@ public class AuthService {
         }
 
         // User 객체 생성 후 디비 저장 - UUID 생성, 비밀번호 암호화, 역할 부여, 계정상태 설정, 회원가입일시 설정
-        String uuid = UUID.randomUUID().toString().replace("-", "");    // UUID 생성
+        String userUuid = UUID.randomUUID().toString().replace("-", "");    // UUID 생성
         String encodedPwd = passwordEncoder.encode(signUpRequest.getPwd().trim());      // 비밀번호 암호화
 
         User user = User.builder()
-                .id(uuid)
+                .id(userUuid)
                 .email(email)
                 .pwd(encodedPwd)
                 .role(UserRoleType.ROLE_USER)
                 .status(UserStatusType.ACTIVE)
                 .registeredAt(LocalDateTime.now())
+                .createdBy(userUuid)
+                .updatedBy(userUuid)
                 .build();
 
-        userRepository.save(user);
+        // Default EventList 생성
+        EventList eventList = EventList.builder()
+                .user(user)
+                .name("inbox")
+                .isDefault(true)
+                .createdBy(userUuid)
+                .updatedBy(userUuid)
+                .build();
+        user.addEventList(eventList);
 
         // TODO) 약관동의내역 DB 저장
+
+        userRepository.save(user);
     }
 
     @Transactional(readOnly = true)

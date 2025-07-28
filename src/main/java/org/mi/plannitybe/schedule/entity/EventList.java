@@ -37,11 +37,14 @@ public class EventList extends BaseEntity {
     private Boolean isDefault;
 
     @Builder
-    public EventList(User user, String name, String color, Boolean isDefault) {
+    public EventList(User user, String name, String color, Boolean isDefault,
+                     String createdBy, String updatedBy) {
         this.user = user;
         this.name = name;
         this.color = color;
         this.isDefault = isDefault;
+        this.createdBy = createdBy;
+        this.updatedBy = updatedBy;
     }
 
     public void update(String name, String color, Boolean isDefault) {
