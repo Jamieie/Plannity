@@ -26,7 +26,7 @@ public class UserTermHistory extends BaseEntity {
 
     @Column(nullable = false)
     @Comment("동의 여부")
-    private Boolean agreed;
+    private Boolean isAgreed;
 
     @Column(length = 255)
     @Comment("동의 일시")
@@ -41,10 +41,10 @@ public class UserTermHistory extends BaseEntity {
     private String endDate;
 
     @Builder
-    public UserTermHistory(UserTerm userTerm, Boolean agreed, String agreedAt, 
+    public UserTermHistory(UserTerm userTerm, Boolean isAgreed, String agreedAt,
                           String startDate, String endDate) {
         this.userTerm = userTerm;
-        this.agreed = agreed;
+        this.isAgreed = isAgreed;
         this.agreedAt = agreedAt;
         this.startDate = startDate;
         this.endDate = endDate;

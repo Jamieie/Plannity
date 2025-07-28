@@ -32,19 +32,19 @@ public class TaskList extends BaseEntity {
 
     @Column(nullable = false)
     @Comment("기본 목록 여부")
-    private Boolean defaultList;
+    private Boolean isDefault;
 
     @Builder
-    public TaskList(User user, String name, String color, Boolean defaultList) {
+    public TaskList(User user, String name, String color, Boolean isDefault) {
         this.user = user;
         this.name = name;
         this.color = color;
-        this.defaultList = defaultList;
+        this.isDefault = isDefault;
     }
 
-    public void update(String name, String color, Boolean defaultList) {
+    public void update(String name, String color, Boolean isDefault) {
         this.name = name;
         this.color = color;
-        this.defaultList = defaultList;
+        this.isDefault = isDefault;
     }
 }

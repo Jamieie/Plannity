@@ -6,6 +6,9 @@ import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
 import org.mi.plannitybe.exception.ExpiredTokenException;
 import org.mi.plannitybe.exception.InvalidTokenException;
+import org.mi.plannitybe.user.dto.CustomUserDetails;
+import org.mi.plannitybe.user.type.UserRoleType;
+import org.mi.plannitybe.user.type.UserStatusType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -34,6 +37,7 @@ public class JwtTokenProvider {
     // User 정보로 AccessToken과 RefreshToken 생성하는 메소드
     public JwtToken generateToken(Authentication authentication) {
 
+
         // Authentication 객체에서 User의 권한 가져오기
         String authorities = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
@@ -45,6 +49,7 @@ public class JwtTokenProvider {
             throw new RuntimeException("Invalid authentication");
         }
 
+        CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
         long now = (new Date()).getTime();
 
         // Access Token 생성
@@ -52,6 +57,8 @@ public class JwtTokenProvider {
         String accessToken = Jwts.builder()
                 .setSubject(authentication.getName())
                 .claim("auth", authorities)
+                .claim("userId", userDetails.getId())
+                .claim("status", userDetails.getStatus().toString())
                 .setExpiration(new Date(now + accessTokenValidity))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
@@ -88,7 +95,14 @@ public class JwtTokenProvider {
                 .toList();
 
         // UserDetails 객체 만들어서 Authentication return
-        UserDetails principal = new User(claims.getSubject(), "", authorities);
+//        UserDetails principal = new User(claims.getSubject(), "", authorities);
+        UserDetails principal = CustomUserDetails.builder()
+                .id(claims.get("userId", String.class))
+                .email(claims.getSubject())
+                .password("")
+                .role(UserRoleType.valueOf(claims.get("auth", String.class)))
+                .status(UserStatusType.valueOf(claims.get("status", String.class)))
+                .build();
         return new UsernamePasswordAuthenticationToken(principal, "", authorities);
     }
 

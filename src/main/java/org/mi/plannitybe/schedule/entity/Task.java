@@ -6,10 +6,14 @@ import org.hibernate.annotations.Comment;
 import org.mi.plannitybe.common.entity.base.BaseEntity;
 import org.mi.plannitybe.schedule.type.TaskStatusType;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "task")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+@NoArgsConstructor
+//@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Task extends BaseEntity {
 
     @Id
@@ -44,12 +48,12 @@ public class Task extends BaseEntity {
     private TaskStatusType status;
 
     @Column(length = 255)
-    @Comment("알림 날짜")
-    private String reminderDate;
+    @Comment("리마인더 날짜")
+    private LocalDateTime reminderDate;
 
-    @Column(length = 255)
-    @Comment("알림 시간")
-    private String reminderTime;
+    @Column(nullable = false)
+    @Comment("종일할일여부")
+    private Boolean isAllDay;
 
     @Column(length = 255)
     @Comment("설명")
@@ -57,8 +61,8 @@ public class Task extends BaseEntity {
 
     @Builder
     public Task(TaskList taskList, String title, Task mainTask, String estimatedDuration,
-               String actualDuration, TaskStatusType status, String reminderDate,
-               String reminderTime, String description) {
+               String actualDuration, TaskStatusType status, LocalDateTime reminderDate,
+               Boolean isAllDay, String description) {
         this.taskList = taskList;
         this.title = title;
         this.mainTask = mainTask;
@@ -66,20 +70,20 @@ public class Task extends BaseEntity {
         this.actualDuration = actualDuration;
         this.status = status;
         this.reminderDate = reminderDate;
-        this.reminderTime = reminderTime;
+        this.isAllDay = isAllDay;
         this.description = description;
     }
 
     public void update(String title, Task mainTask, String estimatedDuration,
-                      String actualDuration, TaskStatusType status, String reminderDate,
-                      String reminderTime, String description) {
+                      String actualDuration, TaskStatusType status, LocalDateTime reminderDate,
+                      Boolean isAllDay, String description) {
         this.title = title;
         this.mainTask = mainTask;
         this.estimatedDuration = estimatedDuration;
         this.actualDuration = actualDuration;
         this.status = status;
         this.reminderDate = reminderDate;
-        this.reminderTime = reminderTime;
+        this.isAllDay = isAllDay;
         this.description = description;
     }
 }

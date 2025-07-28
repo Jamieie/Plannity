@@ -44,7 +44,6 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/webjars/**"
                         ).permitAll()
-                        .requestMatchers("/auth/test").hasAnyRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .formLogin(FormLoginConfigurer::disable)

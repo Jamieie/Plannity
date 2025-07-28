@@ -9,7 +9,9 @@ import org.mi.plannitybe.user.entity.User;
 @Entity
 @Table(name = "event_list")
 @Getter
-@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@Setter
+//@NoArgsConstructor(access = AccessLevel.PROTECTED)
+@NoArgsConstructor
 public class EventList extends BaseEntity {
 
     @Id
@@ -22,7 +24,7 @@ public class EventList extends BaseEntity {
     @Comment("사용자 ID")
     private User user;
 
-    @Column(length = 255)
+    @Column(length = 255, nullable = false)
     @Comment("이벤트 목록 이름")
     private String name;
 
@@ -32,19 +34,19 @@ public class EventList extends BaseEntity {
 
     @Column(nullable = false)
     @Comment("기본 목록 여부")
-    private Boolean defaultList;
+    private Boolean isDefault;
 
     @Builder
-    public EventList(User user, String name, String color, Boolean defaultList) {
+    public EventList(User user, String name, String color, Boolean isDefault) {
         this.user = user;
         this.name = name;
         this.color = color;
-        this.defaultList = defaultList;
+        this.isDefault = isDefault;
     }
 
-    public void update(String name, String color, Boolean defaultList) {
+    public void update(String name, String color, Boolean isDefault) {
         this.name = name;
         this.color = color;
-        this.defaultList = defaultList;
+        this.isDefault = isDefault;
     }
 }

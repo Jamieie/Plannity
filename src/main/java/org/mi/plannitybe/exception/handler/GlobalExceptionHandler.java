@@ -1,8 +1,9 @@
 package org.mi.plannitybe.exception.handler;
 
-import org.mi.plannitybe.exception.EmailAlreadyExistsException;
+import org.mi.plannitybe.exception.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.validation.ObjectError;
@@ -16,7 +17,9 @@ import java.util.Map;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
+    // TODO) GlobalExceptionHandler 리팩토링하기
 
+    // 클라이언트 요청 데이터 유효성 검사 실패 처리 (400)
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<?> handleMethodArgumentNotValidException(MethodArgumentNotValidException ex) {
 
@@ -36,6 +39,38 @@ public class GlobalExceptionHandler {
                 ));
     }
 
+    // 클라이언트 요청 데이터 형식 오류 처리 (400)
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<?> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
+        Throwable cause = ex.getCause().getCause();
+        if (cause instanceof IllegalArgumentException) {
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST) // 400
+                    .body(Map.of(
+                            "code", "INVALID_ARGUMENT",
+                            "messages", cause.getMessage()
+                    ));
+        }
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST) // 400
+                .body(Map.of(
+                        "code", "WRONG_DATA_FORMAT",
+                        "messages", "요청한 데이터의 형식이 올바르지 않습니다."
+                ));
+    }
+
+    // 종일일정일 때 일정 시작날짜와 종료날짜가 유효하지 않은 경우 예외 처리
+    @ExceptionHandler(InvalidAllDayEventDateException.class)
+    public ResponseEntity<?> handleInvalidAllDayEventDateException(InvalidAllDayEventDateException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST) // 400
+                .body(Map.of(
+                        "code", "INVALID_ARGUMENT",
+                        "messages", ex.getMessage()
+                ));
+    }
+
+    // 이미 존재하는 이메일로 회원가입 시도하여 실패할 때 예외 처리 (409)
     @ExceptionHandler(EmailAlreadyExistsException.class)
     public ResponseEntity<?> handleEmailAlreadyExistsException(EmailAlreadyExistsException ex) {
         return ResponseEntity
@@ -46,7 +81,29 @@ public class GlobalExceptionHandler {
                 ));
     }
 
-    // 로그인 실패 시 spring security 예외 처리
+    // 클라이언트 요청값에 해당하는 데이터가 존재하지 않을 때 예외 처리 (404)
+    @ExceptionHandler({EventListNotFoundException.class, TaskNotFoundException.class})
+    public ResponseEntity<?> handleNotFoundException(Exception ex) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND) // 404
+                .body(Map.of(
+                        "code", "DATA_NOT_FOUND",
+                        "message", ex.getMessage()
+                ));
+    }
+
+    // 요청한 EventList의 소유자가 아니어서 접근 권한이 없을 때 예외 처리 (403)
+    @ExceptionHandler(ForbiddenEventListAccessException.class)
+    public ResponseEntity<?> handleForbiddenEventListAccessException(ForbiddenEventListAccessException ex) {
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED) // 403
+                .body(Map.of(
+                        "code", "FORBIDDEN_EVENT_LIST",
+                        "message", ex.getMessage()
+                ));
+    }
+
+    // 로그인 실패 시 spring security 예외 처리 (401)
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<?> handleBadCredentialsException(BadCredentialsException e) {
         return ResponseEntity
@@ -67,7 +124,7 @@ public class GlobalExceptionHandler {
                 ));
     }
 
-    // internal server error 500 처리
+    // internal server error (500)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleException(Exception ex) {
         return ResponseEntity

@@ -5,10 +5,17 @@ import lombok.*;
 import org.hibernate.annotations.Comment;
 import org.mi.plannitybe.common.entity.base.BaseEntity;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+@Builder
 @Entity
 @Table(name = "event")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
+@AllArgsConstructor(access = AccessLevel.PACKAGE)
 public class Event extends BaseEntity {
 
     @Id
@@ -27,43 +34,34 @@ public class Event extends BaseEntity {
 
     @Column(length = 255)
     @Comment("시작 날짜")
-    private String startDate;
+    private LocalDateTime startDate;
 
     @Column(length = 255)
     @Comment("종료 날짜")
-    private String endDate;
+    private LocalDateTime endDate;
 
-    @Column(length = 255)
-    @Comment("시작 시간")
-    private String startTime;
-
-    @Column(length = 255)
-    @Comment("종료 시간")
-    private String endTime;
+    @Column(nullable = false)
+    @Comment("종일일정여부")
+    private Boolean isAllDay;
 
     @Column(length = 255)
     @Comment("설명")
     private String description;
 
-    @Builder
-    public Event(EventList eventList, String title, String startDate, String endDate,
-                String startTime, String endTime, String description) {
-        this.eventList = eventList;
-        this.title = title;
-        this.startDate = startDate;
-        this.endDate = endDate;
-        this.startTime = startTime;
-        this.endTime = endTime;
-        this.description = description;
+    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<EventTask> eventTasks = new ArrayList<>();
+
+    public void addEventTask(EventTask eventTask) {
+        eventTasks.add(eventTask);
     }
 
-    public void update(String title, String startDate, String endDate,
-                      String startTime, String endTime, String description) {
+    public void update(String title, LocalDateTime startDate, LocalDateTime endDate,
+                       Boolean isAllDay, String description) {
         this.title = title;
         this.startDate = startDate;
         this.endDate = endDate;
-        this.startTime = startTime;
-        this.endTime = endTime;
+        this.isAllDay = isAllDay;
         this.description = description;
     }
 }

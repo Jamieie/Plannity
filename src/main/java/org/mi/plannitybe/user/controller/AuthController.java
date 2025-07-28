@@ -55,9 +55,4 @@ public class AuthController {
                         "message", "로그인에 성공했습니다."
                 ));
     }
-
-    @GetMapping("/test")
-    public ResponseEntity<?> test() {
-        return ResponseEntity.status(HttpStatus.OK).body(Map.of("message", "test ok"));
-    }
 }
