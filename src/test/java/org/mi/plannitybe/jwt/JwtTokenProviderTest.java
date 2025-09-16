@@ -3,6 +3,8 @@ package org.mi.plannitybe.jwt;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mi.plannitybe.user.dto.CustomUserDetails;
+import org.mi.plannitybe.user.type.UserStatusType;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -31,7 +33,11 @@ class JwtTokenProviderTest {
     void generateToken_ok() {
         // GIVEN - user 정보(email과 authorities) 담긴 Authentication 객체
         List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority("ROLE_USER"));
-        Authentication authentication = new UsernamePasswordAuthenticationToken("test@test.com", "", authorities);
+        CustomUserDetails userDetails = CustomUserDetails.builder()
+                .email("test@test.com")
+                .status(UserStatusType.ACTIVE)
+                .build();
+        Authentication authentication = new UsernamePasswordAuthenticationToken(userDetails, "", authorities);
 
         // WHEN - generateToken 메서드 실행
         JwtToken jwtToken = jwtTokenProvider.generateToken(authentication);

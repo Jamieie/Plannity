@@ -21,10 +21,7 @@ public class UserSetUp {
 
     public String saveUser(String email, String pwd) {
 
-        String uuid = UUID.randomUUID().toString().replace("-", "");    // UUID 생성
-
         User user = User.builder()
-                .id(uuid)
                 .email(email)
                 .pwd(passwordEncoder.encode(pwd))
                 .role(UserRoleType.ROLE_USER)
@@ -36,10 +33,7 @@ public class UserSetUp {
 
     public String saveInactiveUser(String email, String pwd) {
 
-        String uuid = UUID.randomUUID().toString().replace("-", "");    // UUID 생성
-
         User user = User.builder()
-                .id(uuid)
                 .email(email)
                 .pwd(passwordEncoder.encode(pwd))
                 .role(UserRoleType.ROLE_USER)

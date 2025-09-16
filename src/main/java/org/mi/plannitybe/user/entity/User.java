@@ -4,6 +4,8 @@ import jakarta.annotation.Nullable;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Comment;
+import org.hibernate.annotations.GenericGenerator;
+import org.hibernate.annotations.UuidGenerator;
 import org.mi.plannitybe.common.entity.base.BaseEntity;
 import org.mi.plannitybe.schedule.entity.EventList;
 import org.mi.plannitybe.user.type.UserRoleType;
@@ -20,7 +22,9 @@ import java.util.List;
 public class User extends BaseEntity {
 
     @Id
-    @Column(length = 255)
+    @GeneratedValue
+    @UuidGenerator
+    @Column(length = 36, updatable = false, nullable = false)
     @Comment("사용자 ID")
     private String id;
 
@@ -64,11 +68,12 @@ public class User extends BaseEntity {
     @Comment("비고")
     private String note;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "user", cascade = {CascadeType.PERSIST,CascadeType.REMOVE}, fetch = FetchType.LAZY)
     private List<EventList> eventList = new ArrayList<>();
 
     public void addEventList(EventList eventList) {
         this.eventList.add(eventList);
+        eventList.setUser(this);
     }
 
     @Builder
@@ -90,6 +95,16 @@ public class User extends BaseEntity {
         this.createdBy = createdBy;
         this.updatedBy = updatedBy;
         this.eventList = (eventList == null) ? new ArrayList<>() : eventList;
+    }
+
+    @PrePersist
+    public void prePersist() {
+        if (this.createdBy == null) {
+            this.createdBy = this.id;
+        }
+        if (this.updatedBy == null) {
+            this.updatedBy = this.id;
+        }
     }
 
     public void update(String email, String nickname, String phoneNumber,

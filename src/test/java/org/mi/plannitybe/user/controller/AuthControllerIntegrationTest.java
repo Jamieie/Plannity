@@ -1,5 +1,6 @@
 package org.mi.plannitybe.user.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -7,13 +8,23 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mi.plannitybe.integration.BaseIntegrationTest;
 import org.mi.plannitybe.integration.UserSetUp;
+import org.mi.plannitybe.schedule.entity.EventList;
+import org.mi.plannitybe.schedule.repository.EventListRepository;
 import org.mi.plannitybe.user.dto.LoginRequest;
 import org.mi.plannitybe.user.dto.SignUpRequest;
+import org.mi.plannitybe.user.entity.User;
+import org.mi.plannitybe.user.repository.UserRepository;
+import org.mi.plannitybe.user.type.UserRoleType;
+import org.mi.plannitybe.user.type.UserStatusType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.ResultActions;
 
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Stream;
 
 import static org.hamcrest.Matchers.hasItem;
@@ -21,6 +32,7 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 class AuthControllerIntegrationTest extends BaseIntegrationTest {
 
@@ -30,14 +42,23 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private UserSetUp userSetUp;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private EventListRepository eventListRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     @Test
     @DisplayName("회원가입 성공")
     public void signUp_ok() throws Exception {
 
-        // TODO) 가입된 이메일이 아니라는 것 보장 필요 -> test DB를 별도로 두고 테스트 전 DB의 user 모두 지우는 방법?
+        // TODO) 가입된 이메일이 아니라는 것 보장 필요
 
         // GIVEN - 유효한 이메일과 비밀번호
-        EMAIL = "test@email.com";
+        EMAIL = UUID.randomUUID() + "@email.com";
         PWD = "asdf1234@";
 
         SignUpRequest signUpRequest = new SignUpRequest();
@@ -55,6 +76,86 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
         resultActions
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.message").value("회원가입이 완료되었습니다."));
+    }
+
+    @Test
+    @DisplayName("회원가입 성공 - 성공하면 DB에 user가 저장된다.")
+    public void signUp_ok_userSave() throws Exception {
+
+        // GIVEN - 유효한 이메일과 비밀번호
+        EMAIL = UUID.randomUUID() + "@email.com";
+        PWD = "asdf1234@";
+
+        SignUpRequest signUpRequest = new SignUpRequest();
+        signUpRequest.setEmail(EMAIL);
+        signUpRequest.setPwd(PWD);
+
+        // WHEN - 회원가입 api 호출
+        ResultActions resultActions = mockMvc.perform(post("/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signUpRequest))
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print());
+
+        // THEN - 가입한 email로 DB에서 user 조회 시 존재
+        User saved = userRepository.findByEmail(EMAIL).get();
+        assertNotNull(saved);
+        assertEquals(UserRoleType.ROLE_USER, saved.getRole());
+        assertEquals(UserStatusType.ACTIVE, saved.getStatus());
+    }
+
+
+    @Test
+    @DisplayName("회원가입 성공 - 성공하면 DB에 user 비밀번호가 저장될 때 해시값이 저장되어야 한다.")
+    public void signUp_ok_hashedPasswordSave() throws Exception {
+
+        // GIVEN - 유효한 이메일과 비밀번호
+        EMAIL = UUID.randomUUID() + "@email.com";
+        PWD = "asdf1234@";
+
+        SignUpRequest signUpRequest = new SignUpRequest();
+        signUpRequest.setEmail(EMAIL);
+        signUpRequest.setPwd(PWD);
+
+        // WHEN - 회원가입 api 호출
+        ResultActions resultActions = mockMvc.perform(post("/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signUpRequest))
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print());
+
+        // THEN - 저장된 비밀번호는 평문이 아닌 해시값이어야 함
+        User saved = userRepository.findByEmail(EMAIL).get();
+        String savedPwd = saved.getPwd();
+        assertNotNull(savedPwd);
+        assertNotEquals(savedPwd, PWD);
+        assertTrue(passwordEncoder.matches(PWD, savedPwd));
+    }
+
+    @Test
+    @DisplayName("회원가입 성공 - 성공하면 DB에 해당 user 소유의 default event list가 저장된다.")
+    public void signUp_ok_eventListSave() throws Exception {
+
+        // GIVEN - 유효한 이메일과 비밀번호
+        EMAIL = UUID.randomUUID() + "@email.com";
+        PWD = "asdf1234@";
+
+        SignUpRequest signUpRequest = new SignUpRequest();
+        signUpRequest.setEmail(EMAIL);
+        signUpRequest.setPwd(PWD);
+
+        // WHEN - 회원가입 api 호출
+        ResultActions resultActions = mockMvc.perform(post("/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(signUpRequest))
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print());
+
+        // THEN - DB에 user 소유의 default event list 존재
+        String userId = userRepository.findByEmail(EMAIL).get().getId();
+        List<EventList> eventLists = eventListRepository.findByUserId(userId);
+        assertFalse(eventLists.isEmpty());
+        assertTrue(eventLists.get(0).getIsDefault());
     }
 
     @Test

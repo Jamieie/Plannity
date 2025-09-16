@@ -47,6 +47,16 @@ public class EventList extends BaseEntity {
         this.updatedBy = updatedBy;
     }
 
+    @PrePersist
+    public void prePersist() {
+        if (this.createdBy == null) {
+            this.createdBy = user.getId();
+        }
+        if (this.updatedBy == null) {
+            this.updatedBy = user.getId();
+        }
+    }
+
     public void update(String name, String color, Boolean isDefault) {
         this.name = name;
         this.color = color;

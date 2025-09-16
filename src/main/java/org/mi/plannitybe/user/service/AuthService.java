@@ -44,18 +44,19 @@ public class AuthService {
         }
 
         // User 객체 생성 후 디비 저장 - UUID 생성, 비밀번호 암호화, 역할 부여, 계정상태 설정, 회원가입일시 설정
-        String userUuid = UUID.randomUUID().toString().replace("-", "");    // UUID 생성
+//        String userUuid = UUID.randomUUID().toString().replace("-", "");    // UUID 생성
         String encodedPwd = passwordEncoder.encode(signUpRequest.getPwd().trim());      // 비밀번호 암호화
+        LocalDateTime registerDate = LocalDateTime.now();   // 회원 가입 일시 및 약관 동의 일시
 
         User user = User.builder()
-                .id(userUuid)
+//                .id(userUuid)
                 .email(email)
                 .pwd(encodedPwd)
                 .role(UserRoleType.ROLE_USER)
                 .status(UserStatusType.ACTIVE)
-                .registeredAt(LocalDateTime.now())
-                .createdBy(userUuid)
-                .updatedBy(userUuid)
+                .registeredAt(registerDate)
+//                .createdBy(userUuid)
+//                .updatedBy(userUuid)
                 .build();
 
         // Default EventList 생성
@@ -63,8 +64,8 @@ public class AuthService {
                 .user(user)
                 .name("inbox")
                 .isDefault(true)
-                .createdBy(userUuid)
-                .updatedBy(userUuid)
+//                .createdBy(userUuid)
+//                .updatedBy(userUuid)
                 .build();
         user.addEventList(eventList);
 

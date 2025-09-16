@@ -5,9 +5,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.CsvSource;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.*;
 import org.mi.plannitybe.exception.EventListNotFoundException;
 import org.mi.plannitybe.exception.InvalidAllDayEventDateException;
 import org.mi.plannitybe.exception.TaskNotFoundException;
@@ -35,6 +33,7 @@ import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
@@ -120,6 +119,7 @@ class EventServiceTest {
                 eventListId, title, startDate, endDate, isAllDay, description, taskIds
         );
         setupValidEventList(eventListId, userId);
+        mockEventRepositorySaveReturnsStubEvent();
 
         // WHEN
         eventService.createEvent(createEventRequest, userId);
@@ -143,6 +143,7 @@ class EventServiceTest {
         );
         setupValidEventList(eventListId, userId);
         setupValidTasks(taskIds);
+        mockEventRepositorySaveReturnsStubEvent();
 
         // WHEN
         eventService.createEvent(createEventRequest, userId);
@@ -215,6 +216,13 @@ class EventServiceTest {
         assertThrows(TaskNotFoundException.class, () -> eventService.createEvent(createEventRequest, userId));
     }
 
+    // Event 저장 후 반환값(Event 객체) 설정
+    private void mockEventRepositorySaveReturnsStubEvent() {
+        Event event = Event.builder()
+                .eventList(new EventList())
+                .build();
+        given(eventRepository.save(any(Event.class))).willReturn(event);
+    }
 
     // eventListId로 저장된 EventList 조회 시 유효한 eventList 객체 반환하도록 설정
     private void setupValidEventList(Long eventListId, String userId) {
@@ -251,9 +259,8 @@ class EventServiceTest {
 
     // taskId로 저장된 Task 조회 시 Optional.null 반환하도록 설정 (존재하지 않는 Task)
     private void setupNotExistingTasks(List<Long> taskIds) {
-        List<Task> mockTasks = createMockTasks(taskIds);
-        for (int i = 0; i < taskIds.size(); i++) {
-            given(taskRepository.findById(taskIds.get(i))).willReturn(Optional.empty());
+        for (Long taskId : taskIds) {
+            given(taskRepository.findById(taskId)).willReturn(Optional.empty());
         }
     }
 
