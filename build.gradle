@@ -2,6 +2,7 @@ plugins {
     id 'java'
     id 'org.springframework.boot' version '3.4.4'
     id 'io.spring.dependency-management' version '1.1.7'
+    id 'jacoco'
 }
 
 group = 'org.example'
@@ -47,4 +48,79 @@ dependencies {
 
 tasks.named('test') {
     useJUnitPlatform()
+    finalizedBy jacocoTestReport // Generates report after tests are run
+}
+
+// JaCoCo configuration
+jacoco {
+    toolVersion = "0.8.12"
+    reportsDirectory = layout.buildDirectory.dir('jacocoReport')
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        csv.required = true
+        html.required = true
+    }
+    def Qdomains = []
+    for (qPattern in '**/QA'..'**/QZ') { // qPattern = '**/QA', '**/QB', ... '*.QZ'
+        Qdomains.add(qPattern + '*')
+    }
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                    '**/dto/**',
+                    '**/entity/**',
+                    '**/converter/**',
+                    '**/type/**',
+                    '**/*InitData*',
+                    '**/*Application*',
+                    '**/exception/**',
+                    '**/aop/**',
+                    '**/config/**',
+                    '**/JwtToken'
+            ] + Qdomains)
+        }))
+    }
+    finalizedBy 'jacocoTestCoverageVerification'
+}
+
+jacocoTestCoverageVerification {
+    def Qdomains = []
+    for (qPattern in '*.QA'..'*.QZ') { // qPattern = '*.QA', '*.QB', ... '*.QZ'
+        Qdomains.add(qPattern + '*')
+    }
+    violationRules {
+        rule {
+            enabled = true;
+            element = 'CLASS'
+
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.20
+            }
+
+            limit {
+                counter = 'BRANCH'
+                value = 'COVEREDRATIO'
+                minimum = 0.20
+            }
+
+            excludes = [
+                    '**.dto.**',
+                    '**.entity.**',
+                    '**.converter.**',
+                    '**.type.**',
+                    '**.*InitData*',
+                    '**.*Application*',
+                    '**.exception.**',
+                    '**.aop.**',
+                    '**.config.**',
+                    '**.JwtToken'
+            ] + Qdomains
+        }
+    }
 }
