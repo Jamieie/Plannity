@@ -192,12 +192,12 @@ public class GlobalExceptionHandler {
     // internal server error (500)
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleException(Exception ex) {
+        log.error("Unexpected server error occurred: {}", ex.getMessage(), ex);
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(Map.of(
                         "code", "SERVER_ERROR",
-                        "error", ex.getClass().getName(),
-                        "message", ex.getMessage()
+                        "message", "서버 내부 오류가 발생했습니다."
                 ));
     }
 }

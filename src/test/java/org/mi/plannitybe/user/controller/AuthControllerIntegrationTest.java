@@ -209,7 +209,7 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
         resultActions
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("EMAIL_ALREADY_EXISTS"))
-                .andExpect(jsonPath("$.message").value("이미 가입된 이메일입니다."));
+                .andExpect(jsonPath("$.message").value("이미 등록된 이메일입니다. : " + EMAIL));
     }
 
     @Test

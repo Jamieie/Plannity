@@ -11,6 +11,7 @@ import org.mi.plannitybe.user.repository.UserRepository;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
@@ -40,7 +41,6 @@ class AuthServiceTest {
         // GIVEN - 중복되지 않은 이메일과 비밀번호를 담은 객체
         String okEmail = "test@test.com";
         String password = "test1234@";
-        given(userRepository.findByEmail(okEmail)).willReturn(Optional.empty());
 
         // WHEN - 회원가입 메소드 호출
         SignUpRequest signUpRequest = new SignUpRequest(okEmail, password);
@@ -56,10 +56,10 @@ class AuthServiceTest {
         // GIVEN - 이미 존재하는 이메일과 비밀번호를 담은 객체
         String failEmail = "test@test.com";
         String password = "test1234@";
-        given(userRepository.findByEmail(failEmail)).willThrow(EmailAlreadyExistsException.class);
+        given(userRepository.save(any(User.class))).willThrow(DataIntegrityViolationException.class);
 
         // WHEN & THEN - 회원가입 메소드 호출하면 예외 발생
         SignUpRequest signUpRequest = new SignUpRequest(failEmail, password);
-        assertThrows(EmailAlreadyExistsException.class, () -> authService.signUp(signUpRequest), "이미 가입된 이메일입니다.");
+        assertThrows(EmailAlreadyExistsException.class, () -> authService.signUp(signUpRequest));
     }
 }

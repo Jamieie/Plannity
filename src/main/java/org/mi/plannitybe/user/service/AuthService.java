@@ -12,6 +12,7 @@ import org.mi.plannitybe.user.entity.User;
 import org.mi.plannitybe.user.repository.UserRepository;
 import org.mi.plannitybe.user.type.UserRoleType;
 import org.mi.plannitybe.user.type.UserStatusType;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.core.Authentication;
@@ -37,26 +38,16 @@ public class AuthService {
     @Transactional(rollbackFor = Exception.class, isolation = Isolation.DEFAULT)
     public void signUp(SignUpRequest signUpRequest) {
 
-        // 이메일 중복 검사 - 이미 존재하면 예외 발생
-        String email = signUpRequest.getEmail();
-        if (emailExists(email)) {
-            throw new EmailAlreadyExistsException("이미 가입된 이메일입니다.");
-        }
-
         // User 객체 생성 후 디비 저장 - UUID 생성, 비밀번호 암호화, 역할 부여, 계정상태 설정, 회원가입일시 설정
-//        String userUuid = UUID.randomUUID().toString().replace("-", "");    // UUID 생성
         String encodedPwd = passwordEncoder.encode(signUpRequest.getPwd().trim());      // 비밀번호 암호화
         LocalDateTime registerDate = LocalDateTime.now();   // 회원 가입 일시 및 약관 동의 일시
 
         User user = User.builder()
-//                .id(userUuid)
-                .email(email)
+                .email(signUpRequest.getEmail())
                 .pwd(encodedPwd)
                 .role(UserRoleType.ROLE_USER)
                 .status(UserStatusType.ACTIVE)
                 .registeredAt(registerDate)
-//                .createdBy(userUuid)
-//                .updatedBy(userUuid)
                 .build();
 
         // Default EventList 생성
@@ -64,14 +55,20 @@ public class AuthService {
                 .user(user)
                 .name("inbox")
                 .isDefault(true)
-//                .createdBy(userUuid)
-//                .updatedBy(userUuid)
                 .build();
         user.addEventList(eventList);
 
         // TODO) 약관동의내역 DB 저장
 
-        userRepository.save(user);
+        // User 저장 시도할 때 Email 중복 시 예외 발생
+        try {
+            userRepository.save(user);
+        } catch (DataIntegrityViolationException e) {
+            log.error("User signup failed due to data integrity violation - email: {}, message: {}, cause: {}",
+                    signUpRequest.getEmail(), e.getMessage(),
+                    e.getCause() != null ? e.getCause().getClass().getSimpleName() : "null", e);
+            throw new EmailAlreadyExistsException(signUpRequest.getEmail());
+        }
     }
 
     @Transactional(readOnly = true)
@@ -87,10 +84,5 @@ public class AuthService {
 
         // 인증 정보를 기반으로 JWT 토큰 생성하여 반환
         return jwtTokenProvider.generateToken(authentication);
-    }
-
-    // 이메일 중복 검사
-    private boolean emailExists(String email) {
-        return userRepository.findByEmail(email).isPresent();
     }
 }
