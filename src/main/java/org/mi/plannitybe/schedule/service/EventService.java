@@ -2,10 +2,7 @@ package org.mi.plannitybe.schedule.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.mi.plannitybe.exception.EventListNotFoundException;
-import org.mi.plannitybe.exception.InvalidAllDayEventDateException;
-import org.mi.plannitybe.exception.TaskNotFoundException;
-import org.mi.plannitybe.exception.ForbiddenEventListAccessException;
+import org.mi.plannitybe.exception.*;
 import org.mi.plannitybe.schedule.dto.CreateEventRequest;
 import org.mi.plannitybe.schedule.dto.EventResponse;
 import org.mi.plannitybe.schedule.entity.Event;
@@ -35,9 +32,10 @@ public class EventService {
 
         // 1. createEventRequest의 eventListId에 해당하는 eventList가 존재해야 한다.
         // 2. 해당 eventList의 userId와 요청을 보낸 userId가 동일해야 한다.
-        EventList eventList = eventListRepository.findById(createEventRequest.getEventListId()).orElseThrow(EventListNotFoundException::new);
+        EventList eventList = eventListRepository.findById(createEventRequest.getEventListId()).orElseThrow(
+                () -> new EventListNotFoundException(userId, createEventRequest.getEventListId()));
         if (!userId.equals(eventList.getUser().getId())) {
-            throw new ForbiddenEventListAccessException();
+            throw new EventListAccessDeniedException(userId, createEventRequest.getEventListId());
         }
 
         // 3. isAllDay가 true면
@@ -58,7 +56,7 @@ public class EventService {
         if (!createEventRequest.getTaskIds().isEmpty()) {
             for (Long taskId : createEventRequest.getTaskIds()) {
                 Task task = taskRepository.findById(taskId).orElseThrow(() ->
-                        new TaskNotFoundException(taskId));
+                        new TaskNotFoundException(userId, taskId));
                 tasks.add(task); // taskId에 해당하는 task 객체 리스트 추가
             }
         }
@@ -93,6 +91,29 @@ public class EventService {
                 .isAllDay(save.getIsAllDay())
                 .description(save.getDescription())
                 .eventTaskIds(save.getEventTasks().stream().map(EventTask::getId).collect(Collectors.toList()))
+                .build();
+    }
+
+    public EventResponse getEvent(Long eventId, String userId) {
+        // 1. eventId로 event 조회 -> 없으면 예외
+        Event event = eventRepository.findById(eventId).orElseThrow(
+                () -> new EventNotFoundException(userId, eventId));
+
+        // 2. 조회한 event의 소유자와 로그인한 user가 동일한지 확인 -> 불일치면 예외
+        if (!event.getEventList().getUser().getId().equals(userId)) {
+            throw new EventAccessDeniedException(userId, eventId);
+        }
+
+        // 3. 위 조건 모두 충족하면 조회한 Event 반환
+        return EventResponse.builder()
+                .id(event.getId())
+                .eventListId(event.getEventList().getId())
+                .title(event.getTitle())
+                .startDate(event.getStartDate())
+                .endDate(event.getEndDate())
+                .isAllDay(event.getIsAllDay())
+                .description(event.getDescription())
+                .eventTaskIds(event.getEventTasks().stream().map(EventTask::getId).collect(Collectors.toList()))
                 .build();
     }
 }

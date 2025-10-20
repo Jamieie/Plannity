@@ -180,9 +180,9 @@ class AuthControllerIntegrationTest extends BaseIntegrationTest {
         // THEN - 응답코드 400, 회원가입 실패 메시지
         resultActions
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_ARGUMENT"))
-                .andExpect(jsonPath("$.messages", hasItem("email 형식에 맞춰 입력해 주세요.")))
-                .andExpect(jsonPath("$.messages", hasItem("비밀번호는 영문자, 숫자, 특수문자를 포함한 8~64자여야 합니다.")));
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fieldErrors[*].message", hasItem("email 형식에 맞춰 입력해 주세요.")))
+                .andExpect(jsonPath("$.fieldErrors[*].message", hasItem("비밀번호는 영문자, 숫자, 특수문자를 포함한 8~64자여야 합니다.")));
     }
 
     @Test

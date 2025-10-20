@@ -6,11 +6,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.*;
-import org.mi.plannitybe.exception.EventListNotFoundException;
-import org.mi.plannitybe.exception.InvalidAllDayEventDateException;
-import org.mi.plannitybe.exception.TaskNotFoundException;
-import org.mi.plannitybe.exception.ForbiddenEventListAccessException;
+import org.mi.plannitybe.exception.*;
 import org.mi.plannitybe.schedule.dto.CreateEventRequest;
+import org.mi.plannitybe.schedule.dto.EventResponse;
 import org.mi.plannitybe.schedule.entity.Event;
 import org.mi.plannitybe.schedule.entity.EventList;
 import org.mi.plannitybe.schedule.entity.EventTask;
@@ -60,6 +58,7 @@ class EventServiceTest {
     private String title;
     private String description;
     private List<Long> taskIds;
+
 
     @BeforeEach
     void setUp() {
@@ -171,7 +170,7 @@ class EventServiceTest {
     }
 
     @Test
-    @DisplayName("2. eventList의 소유자 userId와 요청 userId가 다르면 UnauthorizedEventListAccessException이 발생한다.")
+    @DisplayName("2. eventList의 소유자 userId와 요청 userId가 다르면 EventListAccessDeniedException이 발생한다.")
     void createEventFailure_unauthorizedEventListAccessException() {
         // GIVEN
         CreateEventRequest createEventRequest = new CreateEventRequest(
@@ -180,7 +179,7 @@ class EventServiceTest {
         setupDifferentUserIdEventList(eventListId, userId);
 
         // WHEN & THEN
-        assertThrows(ForbiddenEventListAccessException.class, () -> eventService.createEvent(createEventRequest, userId));
+        assertThrows(EventListAccessDeniedException.class, () -> eventService.createEvent(createEventRequest, userId));
     }
 
     @ParameterizedTest(name = "{index} : {0}")
@@ -298,5 +297,48 @@ class EventServiceTest {
                 Arguments.of("날짜지정", LocalDateTime.of(2025, 1, 1, 0, 0), LocalDateTime.of(2025, 1, 1, 0, 0), false, List.of(1L)),
                 Arguments.of("종일일정", LocalDateTime.of(2025, 1, 1, 0, 0), LocalDateTime.of(2025, 1, 2, 0, 0), true, List.of(1L))
         );
+    }
+
+    // 일정 조회 테스트
+    @Test
+    @DisplayName("일정 id로 일정 상세 조회 성공")
+    void getEvent_success() {
+        // GIVEN
+        Long eventId = 1L;
+        Event mockEvent = createMockEvent(eventId, userId);
+        given(eventRepository.findById(eventId)).willReturn(Optional.of(mockEvent));
+
+        // WHEN
+        EventResponse event = eventService.getEvent(eventId, userId);
+
+        // THEN
+        assertThat(event).isNotNull();
+        assertThat(event.getId()).isEqualTo(eventId);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 일정 id로 조회 시 EventNotFoundException 발생")
+    void getEvent_notFound() {
+        Long eventId = 1L;
+        given(eventRepository.findById(eventId)).willReturn(Optional.empty());
+
+        assertThrows(EventNotFoundException.class, () -> eventService.getEvent(eventId, userId));
+    }
+
+    @Test
+    @DisplayName("소유자가 아닌 userId로 일정 조회 시 EventAccessDeniedException 발생")
+    void getEvent_accessDenied() {
+        Long eventId = 1L;
+        Event mockEvent = createMockEvent(eventId, "different" + userId);
+        given(eventRepository.findById(eventId)).willReturn(Optional.of(mockEvent));
+
+        assertThrows(EventAccessDeniedException.class, () -> eventService.getEvent(eventId, userId));
+    }
+
+    private Event createMockEvent(Long eventId, String userId) {
+        return Event.builder()
+                .id(eventId)
+                .eventList(createMockEventList(eventListId, userId))
+                .build();
     }
 }
