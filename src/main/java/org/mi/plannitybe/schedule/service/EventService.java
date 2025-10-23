@@ -57,6 +57,11 @@ public class EventService {
             for (Long taskId : createEventRequest.getTaskIds()) {
                 Task task = taskRepository.findById(taskId).orElseThrow(() ->
                         new TaskNotFoundException(userId, taskId));
+                // task의 소유자와 일정 생성 시도하는 사용자가 동일한지 확인
+                String taskOwnerId = task.getTaskList().getUser().getId();
+                if (!userId.equals(taskOwnerId)) {
+                    throw new TaskAccessDeniedException(userId, taskId);
+                }
                 tasks.add(task); // taskId에 해당하는 task 객체 리스트 추가
             }
         }

@@ -9,10 +9,7 @@ import org.junit.jupiter.params.provider.*;
 import org.mi.plannitybe.exception.*;
 import org.mi.plannitybe.schedule.dto.CreateEventRequest;
 import org.mi.plannitybe.schedule.dto.EventResponse;
-import org.mi.plannitybe.schedule.entity.Event;
-import org.mi.plannitybe.schedule.entity.EventList;
-import org.mi.plannitybe.schedule.entity.EventTask;
-import org.mi.plannitybe.schedule.entity.Task;
+import org.mi.plannitybe.schedule.entity.*;
 import org.mi.plannitybe.schedule.repository.EventListRepository;
 import org.mi.plannitybe.schedule.repository.EventRepository;
 import org.mi.plannitybe.schedule.repository.TaskRepository;
@@ -117,7 +114,7 @@ class EventServiceTest {
         CreateEventRequest createEventRequest = new CreateEventRequest(
                 eventListId, title, startDate, endDate, isAllDay, description, taskIds
         );
-        setupValidEventList(eventListId, userId);
+        setupExistingEventList(eventListId, userId);
         mockEventRepositorySaveReturnsStubEvent();
 
         // WHEN
@@ -140,8 +137,8 @@ class EventServiceTest {
         CreateEventRequest createEventRequest = new CreateEventRequest(
                 eventListId, title, startDate, endDate, isAllDay, description, taskIds
         );
-        setupValidEventList(eventListId, userId);
-        setupValidTasks(taskIds);
+        setupExistingEventList(eventListId, userId);
+        setupExistingTasks(taskIds, userId);
         mockEventRepositorySaveReturnsStubEvent();
 
         // WHEN
@@ -176,7 +173,7 @@ class EventServiceTest {
         CreateEventRequest createEventRequest = new CreateEventRequest(
                 eventListId, title, startDate, endDate, isAllDay, description, taskIds
         );
-        setupDifferentUserIdEventList(eventListId, userId);
+        setupExistingEventList(eventListId, "different" + userId);
 
         // WHEN & THEN
         assertThrows(EventListAccessDeniedException.class, () -> eventService.createEvent(createEventRequest, userId));
@@ -194,7 +191,7 @@ class EventServiceTest {
         CreateEventRequest createEventRequest = new CreateEventRequest(
                 eventListId, title, startDate, endDate, isAllDay, description, taskIds
         );
-        setupValidEventList(eventListId, userId);
+        setupExistingEventList(eventListId, userId);
 
         // WHEN & THEN
         assertThrows(InvalidAllDayEventDateException.class, () -> eventService.createEvent(createEventRequest, userId));
@@ -208,7 +205,7 @@ class EventServiceTest {
         CreateEventRequest createEventRequest = new CreateEventRequest(
                 eventListId, title, startDate, endDate, isAllDay, null, taskIds
         );
-        setupValidEventList(eventListId, userId);
+        setupExistingEventList(eventListId, userId);
         setupNotExistingTasks(taskIds);
 
         // WHEN & THEN
@@ -224,7 +221,7 @@ class EventServiceTest {
     }
 
     // eventListId로 저장된 EventList 조회 시 유효한 eventList 객체 반환하도록 설정
-    private void setupValidEventList(Long eventListId, String userId) {
+    private void setupExistingEventList(Long eventListId, String userId) {
         EventList mockEventList = createMockEventList(eventListId, userId);
         given(eventListRepository.findById(eventListId)).willReturn(Optional.of(mockEventList));
     }
@@ -232,12 +229,6 @@ class EventServiceTest {
     // eventListId로 저장된 EventList 조회 시 Optional.null 반환하도록 설정 (존재하지 않는 EventList)
     private void setupNotExistingEventList(Long eventListId) {
         given(eventListRepository.findById(eventListId)).willReturn(Optional.empty());
-    }
-
-    // eventListId로 저장된 EventList 조회 시 userId가 다른 eventList 객체 반환하도록 설정
-    private void setupDifferentUserIdEventList(Long eventListId, String userId) {
-        EventList mockEventList = createMockEventList(eventListId, "different" + userId);
-        given(eventListRepository.findById(eventListId)).willReturn(Optional.of(mockEventList));
     }
 
     // mockEventList 객체 생성하여 반환하는 메소드
@@ -249,8 +240,8 @@ class EventServiceTest {
     }
 
     // taskId로 저장된 Task 조회 시 유효한 task 객체 반환하도록 설정
-    private void setupValidTasks(List<Long> taskIds) {
-        List<Task> mockTasks = createMockTasks(taskIds);
+    private void setupExistingTasks(List<Long> taskIds, String userId) {
+        List<Task> mockTasks = createMockTasks(taskIds, userId);
         for (int i = 0; i < taskIds.size(); i++) {
             given(taskRepository.findById(taskIds.get(i))).willReturn(Optional.of(mockTasks.get(i)));
         }
@@ -264,11 +255,12 @@ class EventServiceTest {
     }
 
     // mockTasks 리스트 객체 생성하여 반환하는 메소드
-    private List<Task> createMockTasks(List<Long> taskIds) {
+    private List<Task> createMockTasks(List<Long> taskIds, String userId) {
         List<Task> tasks = new ArrayList<>();
         for (Long taskId : taskIds) {
             Task task = new Task();
             task.setId(taskId);
+            task.setTaskList(TaskList.builder().user(User.builder().id(userId).build()).build());
             tasks.add(task);
         }
         return tasks;

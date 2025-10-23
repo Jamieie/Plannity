@@ -103,7 +103,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.BAD_REQUEST) // 400
                 .body(Map.of(
-                        "code", "INVALID_ARGUMENT",
+                        "code", "VALIDATION_FAILED",
                         "message", ex.getMessage()
                 ));
     }
@@ -123,7 +123,7 @@ public class GlobalExceptionHandler {
     // 본인 소유가 아닌 데이터에 접근 시도할 때 예외 처리 (404 : 보안을 위해 403 X)
     @ExceptionHandler({EventListNotFoundException.class, TaskNotFoundException.class,
             EventNotFoundException.class, EventAccessDeniedException.class,
-            EventListAccessDeniedException.class})
+            EventListAccessDeniedException.class, TaskAccessDeniedException.class})
     public ResponseEntity<?> handleNotFoundException(ResourceException ex) {
 
         if (ex instanceof ResourceAccessDeniedException) {        // 권한 없는 접근 시도 로그
@@ -143,7 +143,7 @@ public class GlobalExceptionHandler {
         } else if (ex instanceof EventListNotFoundException || ex instanceof EventListAccessDeniedException) {
             code = "EVENT_LIST_NOT_FOUND";
             message = "일정리스트가 존재하지 않습니다.";
-        } else if (ex instanceof TaskNotFoundException) {
+        } else if (ex instanceof TaskNotFoundException || ex instanceof TaskAccessDeniedException) {
             code = "TASK_NOT_FOUND";
             message = "할일이 존재하지 않습니다.";
         } else {

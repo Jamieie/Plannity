@@ -2,10 +2,12 @@ package org.mi.plannitybe.schedule.dto;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
+import org.mi.plannitybe.exception.InvalidAllDayEventDateException;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -26,7 +28,7 @@ public class CreateEventRequest {
 
     private LocalDateTime endDate;
 
-    @NotNull
+    @NotNull(message = "종일 일정 여부는 필수 입력값입니다.")
     private Boolean isAllDay;
 
     private String description;
@@ -41,12 +43,8 @@ public class CreateEventRequest {
                               @JsonProperty("isAllDay") Boolean isAllDay,
                               @JsonProperty("description") String description,
                               @JsonProperty("tasks") List<Long> tasks) {
-
-        if (!isValidDates(startDate, endDate))
-            throw new IllegalArgumentException("입력된 일정의 날짜가 유효하지 않습니다.");
-
         this.eventListId = eventListId;
-        this.title = title.trim();
+        this.title = title != null ? title.trim() : "";
         this.startDate = startDate;
         this.endDate = endDate;
         this.isAllDay = isAllDay;
@@ -57,8 +55,9 @@ public class CreateEventRequest {
         }
     }
 
-    // startDate와 endDate 유효성 검사
-    private boolean isValidDates(LocalDateTime startDate, LocalDateTime endDate) {
+    // startDate와 endDate 조합 유효성 검사
+    @AssertTrue(message = "입력된 일정의 날짜 조합이 유효하지 않습니다.")
+    public boolean isValidDateCombination() {
         if (startDate == null && endDate == null) return true; // 둘 다 null
         if (startDate != null && endDate != null) return !endDate.isBefore(startDate); // 둘 다 값이 존재하면서 endDate가 startDate와 같거나 보다 미래
         return false; // 둘 중 하나만 null인 경우
