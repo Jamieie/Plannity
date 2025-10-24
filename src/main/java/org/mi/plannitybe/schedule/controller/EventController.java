@@ -3,18 +3,23 @@ package org.mi.plannitybe.schedule.controller;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.mi.plannitybe.schedule.dto.CreateEventRequest;
+import org.mi.plannitybe.schedule.dto.EventCalendarRequest;
+import org.mi.plannitybe.schedule.dto.EventCalendarResponse;
 import org.mi.plannitybe.schedule.dto.EventResponse;
 import org.mi.plannitybe.schedule.service.EventService;
 import org.mi.plannitybe.user.dto.CustomUserDetails;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -42,5 +47,15 @@ public class EventController {
         String userId = userDetails.getId();
         EventResponse eventResponse = eventService.getEvent(eventId, userId);
         return ResponseEntity.ok(eventResponse);
+    }
+
+    @GetMapping
+    public ResponseEntity<List<EventCalendarResponse>> getEventsForCalendar(
+            @Valid EventCalendarRequest eventCalendarRequest,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        
+        String userId = userDetails.getId();
+        List<EventCalendarResponse> events = eventService.getEventsForCalendar(eventCalendarRequest.getFrom(), eventCalendarRequest.getTo(), userId);
+        return ResponseEntity.ok(events);
     }
 }

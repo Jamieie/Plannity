@@ -57,6 +57,9 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
     private static final LocalDateTime TEST_START_DATE = LocalDateTime.of(2024, 1, 1, 10, 0, 0);
     private static final LocalDateTime TEST_END_DATE = LocalDateTime.of(2024, 1, 1, 12, 0, 0);
+    // getEventsForCalendar 테스트용 상수
+    private static final String DEFAULT_FROM_DATE = "2024-04-01T00:00:00";
+    private static final String DEFAULT_TO_DATE = "2024-04-30T00:00:00";
 
     @Autowired
     private UserSetUp userSetUp;
@@ -609,5 +612,306 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
 
         json.append("}");
         return json.toString();
+    }
+
+    // ================ getEventsForCalendar 테스트 ================
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "'기본 범위 내 일정', '2024-04-15T10:00:00', '2024-04-15T12:00:00', 'Event 1', '2024-04-20T14:00:00', '2024-04-20T16:00:00', 'Event 2'",
+            "'경계값 - from과 같은 시작시간', '2024-04-01T00:00:00', '2024-04-01T02:00:00', 'Event Starts At From', '2024-04-29T22:00:00', '2024-04-30T00:00:00', 'Event Ends At To'"
+    })
+    @DisplayName("getEventsForCalendar 성공 - 날짜 범위 내 일정 조회")
+    void getEventsForCalendar_success(String testDescription, 
+                                      String event1Start, String event1End, String event1Title,
+                                      String event2Start, String event2End, String event2Title) throws Exception {
+        // GIVEN - 사용자, EventList 생성
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        String accessToken = createJwtToken(user);
+
+        // 이벤트 생성
+        Event event1 = createEventWithDates(eventList, event1Title, 
+                LocalDateTime.parse(event1Start),
+                LocalDateTime.parse(event1End));
+        Event event2 = createEventWithDates(eventList, event2Title,
+                LocalDateTime.parse(event2Start),
+                LocalDateTime.parse(event2End));
+
+        // WHEN - GET /events 호출
+        mockMvc.perform(get("/events")
+                        .param("from", DEFAULT_FROM_DATE)
+                        .param("to", DEFAULT_TO_DATE)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                // THEN - 성공 응답 검증
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].eventId").value(event1.getId()))
+                .andExpect(jsonPath("$[0].title").value(event1Title))
+                .andExpect(jsonPath("$[0].isAllDay").value(false))
+                .andExpect(jsonPath("$[1].eventId").value(event2.getId()))
+                .andExpect(jsonPath("$[1].title").value(event2Title))
+                .andExpect(jsonPath("$[1].isAllDay").value(false));
+    }
+
+    @Test
+    @DisplayName("getEventsForCalendar 성공 - 시작날짜 기준 정렬")
+    void getEventsForCalendar_success_sortByStartDate() throws Exception {
+        // GIVEN - 사용자, EventList 생성
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        String accessToken = createJwtToken(user);
+
+        // 정렬 테스트를 위해 늦은 시간부터 생성
+        Event eventLater = createEventWithDates(eventList, "Event Later", 
+                LocalDateTime.of(2024, 4, 20, 14, 0),
+                LocalDateTime.of(2024, 4, 20, 16, 0));
+        Event eventMiddle = createEventWithDates(eventList, "Event Middle",
+                LocalDateTime.of(2024, 4, 15, 10, 0),
+                LocalDateTime.of(2024, 4, 15, 12, 0));
+        Event eventEarlier = createEventWithDates(eventList, "Event Earlier",
+                LocalDateTime.of(2024, 4, 5, 9, 0),
+                LocalDateTime.of(2024, 4, 5, 11, 0));
+
+        // WHEN - GET /events 호출
+        mockMvc.perform(get("/events")
+                        .param("from", DEFAULT_FROM_DATE)
+                        .param("to", DEFAULT_TO_DATE)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                // THEN - 시작날짜 기준 오름차순 정렬 확인
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].eventId").value(eventEarlier.getId()))
+                .andExpect(jsonPath("$[0].title").value("Event Earlier"))
+                .andExpect(jsonPath("$[0].startDate").value("2024-04-05T09:00:00"))
+                .andExpect(jsonPath("$[1].eventId").value(eventMiddle.getId()))
+                .andExpect(jsonPath("$[1].title").value("Event Middle"))
+                .andExpect(jsonPath("$[1].startDate").value("2024-04-15T10:00:00"))
+                .andExpect(jsonPath("$[2].eventId").value(eventLater.getId()))
+                .andExpect(jsonPath("$[2].title").value("Event Later"))
+                .andExpect(jsonPath("$[2].startDate").value("2024-04-20T14:00:00"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "'from과 to가 동일', '2024-04-15T10:00:00', '2024-04-15T10:00:00'",
+            "'하루 차이', '2024-04-15T00:00:00', '2024-04-16T00:00:00'",
+            "'일주일 차이', '2024-04-01T00:00:00', '2024-04-08T00:00:00'",
+            "'한 달 차이', '2024-04-01T00:00:00', '2024-05-01T00:00:00'"
+    })
+    @DisplayName("getEventsForCalendar 성공 - 다양한 날짜 범위 조합")
+    void getEventsForCalendar_success_variousDateRanges(String testDescription, String fromParam, String toParam) throws Exception {
+        // GIVEN - 사용자, EventList 생성
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        String accessToken = createJwtToken(user);
+
+        // 범위 내에 포함될 이벤트 생성 (모든 테스트 케이스에서 조회될 수 있도록)
+        Event eventInRange = createEventWithDates(eventList, "Event In Range",
+                LocalDateTime.parse(fromParam),  // from과 동일한 시간에 시작
+                LocalDateTime.parse(fromParam)); // to와 동일한 시간에 종료
+
+        // WHEN - GET /events 호출
+        mockMvc.perform(get("/events")
+                        .param("from", fromParam)
+                        .param("to", toParam)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                // THEN - 성공 응답 검증
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].eventId").value(eventInRange.getId()))
+                .andExpect(jsonPath("$[0].title").value("Event In Range"))
+                .andExpect(jsonPath("$[0].isAllDay").value(false));
+    }
+
+    @Test
+    @DisplayName("getEventsForCalendar 성공 - 빈 결과")
+    void getEventsForCalendar_success_emptyResult() throws Exception {
+        // GIVEN - 사용자만 생성 (이벤트 없음)
+        User user = createTestUser();
+        String accessToken = createJwtToken(user);
+
+        // WHEN - GET /events 호출
+        mockMvc.perform(get("/events")
+                        .param("from", DEFAULT_FROM_DATE)
+                        .param("to", DEFAULT_TO_DATE)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                // THEN - 빈 배열 응답
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("getEventsForCalendar 성공 - 범위 밖 일정은 제외")
+    void getEventsForCalendar_success_excludeOutOfRangeEvents() throws Exception {
+        // GIVEN - 사용자, EventList 생성
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        String accessToken = createJwtToken(user);
+
+        // 범위 내 이벤트
+        Event eventInRange = createEventWithDates(eventList, "Event In Range",
+                LocalDateTime.of(2024, 4, 15, 10, 0),
+                LocalDateTime.of(2024, 4, 15, 12, 0));
+
+        // 범위 밖 이벤트들 (조회되지 않음을 확인하기 위해 생성)
+        createEventWithDates(eventList, "Event Before Range",
+                LocalDateTime.of(2024, 3, 15, 10, 0),
+                LocalDateTime.of(2024, 3, 15, 12, 0));
+
+        createEventWithDates(eventList, "Event After Range",
+                LocalDateTime.of(2024, 5, 15, 10, 0),
+                LocalDateTime.of(2024, 5, 15, 12, 0));
+
+        // WHEN - GET /events 호출
+        mockMvc.perform(get("/events")
+                        .param("from", DEFAULT_FROM_DATE)
+                        .param("to", DEFAULT_TO_DATE)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                // THEN - 범위 내 이벤트만 조회
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].eventId").value(eventInRange.getId()))
+                .andExpect(jsonPath("$[0].title").value("Event In Range"));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "'from 파라미터 누락', 'to', '2024-04-30T00:00:00', 'from'",
+            "'to 파라미터 누락', 'from', '2024-04-01T00:00:00', 'to'"
+    })
+    @DisplayName("getEventsForCalendar 실패 - 필수 파라미터 누락")
+    void getEventsForCalendar_fail_missingRequiredParameter(String testDescription, 
+                                                           String paramName, String paramValue, 
+                                                           String expectedMissingField) throws Exception {
+        // GIVEN
+        User user = createTestUser();
+        String accessToken = createJwtToken(user);
+
+        // WHEN & THEN
+        mockMvc.perform(get("/events")
+                        .param(paramName, paramValue)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fieldErrors[*].field", hasItem(expectedMissingField)));
+    }
+
+    @Test
+    @DisplayName("getEventsForCalendar 실패 - from이 to보다 미래")
+    void getEventsForCalendar_fail_fromAfterTo() throws Exception {
+        // GIVEN
+        User user = createTestUser();
+        String accessToken = createJwtToken(user);
+
+        // WHEN & THEN
+        mockMvc.perform(get("/events")
+                        .param("from", "2024-04-30T00:00:00")
+                        .param("to", "2024-04-01T00:00:00")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fieldErrors[*].field", hasItem("validRange")));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {
+            "invalid-date",
+            "2024-13-01T00:00:00",
+            "2024/04/01 10:00:00",
+            "2024-04-01 10:00:00"
+    })
+    @DisplayName("getEventsForCalendar 실패 - 잘못된 날짜 형식")
+    void getEventsForCalendar_fail_invalidDateFormat(String invalidDate) throws Exception {
+        // GIVEN
+        User user = createTestUser();
+        String accessToken = createJwtToken(user);
+
+        // WHEN & THEN
+        mockMvc.perform(get("/events")
+                        .param("from", invalidDate)
+                        .param("to", "2024-04-30T00:00:00")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"))
+                .andExpect(jsonPath("$.fieldErrors[0].field").value("from"))
+                .andExpect(jsonPath("$.fieldErrors[0].message").value("from 필드의 날짜 형식이 올바르지 않습니다. (예: 2024-04-01T10:00:00)"));
+    }
+
+    @Test
+    @DisplayName("getEventsForCalendar 실패 - 인증 없음")
+    void getEventsForCalendar_fail_noAuthentication() throws Exception {
+        // WHEN & THEN
+        mockMvc.perform(get("/events")
+                        .param("from", DEFAULT_FROM_DATE)
+                        .param("to", DEFAULT_TO_DATE)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHORIZED"));
+    }
+
+    @Test
+    @DisplayName("getEventsForCalendar 성공 - 날짜 없는 일정은 제외")
+    void getEventsForCalendar_success_excludeEventsWithoutDates() throws Exception {
+        // GIVEN - 사용자, EventList 생성
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        String accessToken = createJwtToken(user);
+
+        // 날짜 있는 이벤트와 날짜 없는 이벤트 생성
+        Event eventWithDate = createEventWithDates(eventList, "Event With Date",
+                LocalDateTime.of(2024, 4, 15, 10, 0),
+                LocalDateTime.of(2024, 4, 15, 12, 0));
+        // 날짜 없는 이벤트 (조회되지 않음을 확인하기 위해 생성)
+        createEvent(eventList, "Event Without Date", DEFAULT_DESCRIPTION);
+
+        // WHEN - GET /events 호출
+        mockMvc.perform(get("/events")
+                        .param("from", DEFAULT_FROM_DATE)
+                        .param("to", DEFAULT_TO_DATE)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                // THEN - 날짜 있는 이벤트만 조회
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].eventId").value(eventWithDate.getId()))
+                .andExpect(jsonPath("$[0].title").value("Event With Date"));
+    }
+
+    // 헬퍼 메서드
+    private Event createEventWithDates(EventList eventList, String title, LocalDateTime startDate, LocalDateTime endDate) {
+        Event event = Event.builder()
+                .eventList(eventList)
+                .title(title)
+                .startDate(startDate)
+                .endDate(endDate)
+                .isAllDay(false)
+                .description(DEFAULT_DESCRIPTION)
+                .build();
+        return eventRepository.save(event);
     }
 }

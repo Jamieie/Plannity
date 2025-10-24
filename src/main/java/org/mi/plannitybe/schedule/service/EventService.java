@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.mi.plannitybe.exception.*;
 import org.mi.plannitybe.schedule.dto.CreateEventRequest;
+import org.mi.plannitybe.schedule.dto.EventCalendarResponse;
 import org.mi.plannitybe.schedule.dto.EventResponse;
 import org.mi.plannitybe.schedule.entity.Event;
 import org.mi.plannitybe.schedule.entity.EventList;
@@ -14,6 +15,7 @@ import org.mi.plannitybe.schedule.repository.EventRepository;
 import org.mi.plannitybe.schedule.repository.TaskRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -120,5 +122,9 @@ public class EventService {
                 .description(event.getDescription())
                 .eventTaskIds(event.getEventTasks().stream().map(EventTask::getId).collect(Collectors.toList()))
                 .build();
+    }
+
+    public List<EventCalendarResponse> getEventsForCalendar(LocalDateTime from, LocalDateTime to, String userId) {
+        return eventRepository.findEventsByUserIdAndDateRange(userId, from, to);
     }
 }

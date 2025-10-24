@@ -14,6 +14,7 @@ import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -26,6 +27,17 @@ import java.util.Map;
 @Log4j2
 @ControllerAdvice
 public class GlobalExceptionHandler {
+
+    // 필수 요청 파라미터 누락 처리 (400)
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<?> handleMissingServletRequestParameterException(MissingServletRequestParameterException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(Map.of(
+                        "code", "MISSING_PARAMETER",
+                        "message", String.format("필수 파라미터 '%s'가 누락되었습니다.", ex.getParameterName())
+                ));
+    }
 
     // 요청 파라미터의 타입 변환 실패 (PathVariable, RequestParam 등) 처리 (400)
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -83,6 +95,12 @@ public class GlobalExceptionHandler {
                     ? ((org.springframework.validation.FieldError) error).getField() 
                     : "unknown";
             String message = error.getDefaultMessage() != null ? error.getDefaultMessage() : "유효성 검사 실패";
+            
+            // 날짜 형식 오류 메시지 가공
+            if (message.contains("Failed to convert") && message.contains("LocalDateTime")) {
+                message = field + " 필드의 날짜 형식이 올바르지 않습니다. (예: 2024-04-01T10:00:00)";
+            }
+            
             fieldErrors.add(Map.of(
                     "field", field,
                     "message", message
