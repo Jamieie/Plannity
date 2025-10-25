@@ -97,7 +97,11 @@ public class EventService {
                 .endDate(save.getEndDate())
                 .isAllDay(save.getIsAllDay())
                 .description(save.getDescription())
-                .eventTaskIds(save.getEventTasks().stream().map(EventTask::getId).collect(Collectors.toList()))
+                .taskIds(
+                        save.getEventTasks().stream()
+                                .map(EventTask::getTask)
+                                .map(Task::getId)
+                                .collect(Collectors.toList()))
                 .build();
     }
 
@@ -120,7 +124,11 @@ public class EventService {
                 .endDate(event.getEndDate())
                 .isAllDay(event.getIsAllDay())
                 .description(event.getDescription())
-                .eventTaskIds(event.getEventTasks().stream().map(EventTask::getId).collect(Collectors.toList()))
+                .taskIds(
+                        event.getEventTasks().stream()
+                                .map(EventTask::getTask)
+                                .map(Task::getId)
+                                .collect(Collectors.toList()))
                 .build();
     }
 

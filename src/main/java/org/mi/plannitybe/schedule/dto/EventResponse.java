@@ -17,10 +17,10 @@ public class EventResponse {
     private LocalDateTime endDate;
     private Boolean isAllDay;
     private String description;
-    private List<Long> eventTaskIds;
+    private List<Long> taskIds;
 
     @Builder
-    public EventResponse(Long id, Long eventListId, String title, LocalDateTime startDate, LocalDateTime endDate, Boolean isAllDay, String description, List<Long> eventTaskIds) {
+    public EventResponse(Long id, Long eventListId, String title, LocalDateTime startDate, LocalDateTime endDate, Boolean isAllDay, String description, List<Long> taskIds) {
         this.id = id;
         this.eventListId = eventListId;
         this.title = title;
@@ -28,6 +28,6 @@ public class EventResponse {
         this.endDate = endDate;
         this.isAllDay = isAllDay;
         this.description = description;
-        this.eventTaskIds = eventTaskIds;
+        this.taskIds = taskIds;
     }
 }

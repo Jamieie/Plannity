@@ -424,7 +424,7 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.endDate").value(savedEvent.getEndDate().format(DATE_TIME_FORMATTER)))
                 .andExpect(jsonPath("$.isAllDay").value(savedEvent.getIsAllDay()))
                 .andExpect(jsonPath("$.description").value(savedEvent.getDescription()))
-                .andExpect(jsonPath("$.eventTaskIds").isArray());
+                .andExpect(jsonPath("$.taskIds").isArray());
     }
 
     @Test
