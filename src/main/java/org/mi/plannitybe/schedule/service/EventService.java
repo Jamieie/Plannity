@@ -3,6 +3,7 @@ package org.mi.plannitybe.schedule.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.mi.plannitybe.exception.*;
+import org.mi.plannitybe.schedule.domain.EventDateTime;
 import org.mi.plannitybe.schedule.dto.CreateEventRequest;
 import org.mi.plannitybe.schedule.dto.EventCalendarResponse;
 import org.mi.plannitybe.schedule.dto.EventResponse;
@@ -32,25 +33,11 @@ public class EventService {
     // user의 event를 생성하는 메서드
     public EventResponse createEvent(CreateEventRequest createEventRequest, String userId) {
 
-        // 1. createEventRequest의 eventListId에 해당하는 eventList가 존재해야 한다.
-        // 2. 해당 eventList의 userId와 요청을 보낸 userId가 동일해야 한다.
+        // createEventRequest의 eventListId 유효성 검증 - 존재 여부 및 소유자 일치 여부
         EventList eventList = eventListRepository.findById(createEventRequest.getEventListId()).orElseThrow(
                 () -> new EventListNotFoundException(userId, createEventRequest.getEventListId()));
         if (!userId.equals(eventList.getUser().getId())) {
             throw new EventListAccessDeniedException(userId, createEventRequest.getEventListId());
-        }
-
-        // 3. isAllDay가 true면
-        // 3-1. startDate와 endDate가 모두 값이 있어야 한다.
-        // 3-2. endDate가 startDate보다 하루 이상 커야 한다.
-        // 3-3. startDate와 endDate의 시간은 00:00:00이여야 한다.
-        if (createEventRequest.getIsAllDay()) {
-            if (!createEventRequest.hasBothDates())
-                throw new InvalidAllDayEventDateException("종일일정은 날짜가 반드시 지정되어야 합니다.");
-            if (!createEventRequest.isStartAtMidnight() || !createEventRequest.isEndAtMidnight())
-                throw new InvalidAllDayEventDateException("종일일정은 시작날짜와 종료날짜의 시간을 별도로 설정할 수 없습니다.");
-            if (createEventRequest.getDurationInDays() < 1)
-                throw new InvalidAllDayEventDateException("종일일정의 날짜는 하루 단위로 설정할 수 있습니다.");
         }
 
         // 4. tasks에 값이 존재하면 각각의 task는 존재하는 task여야 한다.
@@ -69,12 +56,13 @@ public class EventService {
         }
 
         // 5. 위 값으로 Event를 생성한다.
+        EventDateTime eventDateTime = createEventRequest.getEventDateTime();
         Event event = Event.builder()
                 .eventList(eventList)
                 .title(createEventRequest.getTitle())
-                .startDate(createEventRequest.getStartDate())
-                .endDate(createEventRequest.getEndDate())
-                .isAllDay(createEventRequest.getIsAllDay())
+                .startDate(eventDateTime.getStartDate())
+                .endDate(eventDateTime.getEndDate())
+                .isAllDay(eventDateTime.getIsAllDay())
                 .description(createEventRequest.getDescription())
                 .build();
 
@@ -93,9 +81,7 @@ public class EventService {
                 .id(save.getId())
                 .eventListId(save.getEventList().getId())
                 .title(save.getTitle())
-                .startDate(save.getStartDate())
-                .endDate(save.getEndDate())
-                .isAllDay(save.getIsAllDay())
+                .eventDateTime(save.getEventDateTime())
                 .description(save.getDescription())
                 .taskIds(
                         save.getEventTasks().stream()
@@ -120,9 +106,7 @@ public class EventService {
                 .id(event.getId())
                 .eventListId(event.getEventList().getId())
                 .title(event.getTitle())
-                .startDate(event.getStartDate())
-                .endDate(event.getEndDate())
-                .isAllDay(event.getIsAllDay())
+                .eventDateTime(event.getEventDateTime())
                 .description(event.getDescription())
                 .taskIds(
                         event.getEventTasks().stream()

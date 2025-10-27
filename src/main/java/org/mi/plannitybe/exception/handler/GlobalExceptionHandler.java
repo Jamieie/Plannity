@@ -115,17 +115,6 @@ public class GlobalExceptionHandler {
                 ));
     }
 
-    // 종일일정일 때 일정 시작날짜와 종료날짜가 유효하지 않은 경우 예외 처리
-    @ExceptionHandler(InvalidAllDayEventDateException.class)
-    public ResponseEntity<?> handleInvalidAllDayEventDateException(InvalidAllDayEventDateException ex) {
-        return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST) // 400
-                .body(Map.of(
-                        "code", "VALIDATION_FAILED",
-                        "message", ex.getMessage()
-                ));
-    }
-
     // 이미 존재하는 이메일로 회원가입 시도하여 실패할 때 예외 처리 (409)
     @ExceptionHandler(EmailAlreadyExistsException.class)
     public ResponseEntity<?> handleEmailAlreadyExistsException(EmailAlreadyExistsException ex) {

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.Comment;
 import org.mi.plannitybe.common.entity.base.BaseEntity;
+import org.mi.plannitybe.schedule.domain.EventDateTime;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -63,5 +64,15 @@ public class Event extends BaseEntity {
         this.endDate = endDate;
         this.isAllDay = isAllDay;
         this.description = description;
+    }
+
+    public EventDateTime getEventDateTime() {
+        return EventDateTime.of(startDate, endDate, isAllDay);
+    }
+
+    public void updateFromEventDateTime(EventDateTime eventDateTime) {
+        this.startDate = eventDateTime.getStartDate();
+        this.endDate = eventDateTime.getEndDate();
+        this.isAllDay = eventDateTime.getIsAllDay();
     }
 }

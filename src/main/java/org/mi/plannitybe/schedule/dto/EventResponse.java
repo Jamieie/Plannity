@@ -1,9 +1,8 @@
 package org.mi.plannitybe.schedule.dto;
 
 import lombok.*;
-import org.mi.plannitybe.schedule.entity.EventTask;
+import org.mi.plannitybe.schedule.domain.EventDateTime;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @NoArgsConstructor
@@ -13,20 +12,16 @@ public class EventResponse {
     private Long id;
     private Long eventListId;
     private String title;
-    private LocalDateTime startDate;
-    private LocalDateTime endDate;
-    private Boolean isAllDay;
+    private EventDateTime eventDateTime;
     private String description;
     private List<Long> taskIds;
 
     @Builder
-    public EventResponse(Long id, Long eventListId, String title, LocalDateTime startDate, LocalDateTime endDate, Boolean isAllDay, String description, List<Long> taskIds) {
+    public EventResponse(Long id, Long eventListId, String title, EventDateTime eventDateTime, String description, List<Long> taskIds) {
         this.id = id;
         this.eventListId = eventListId;
         this.title = title;
-        this.startDate = startDate;
-        this.endDate = endDate;
-        this.isAllDay = isAllDay;
+        this.eventDateTime = eventDateTime;
         this.description = description;
         this.taskIds = taskIds;
     }

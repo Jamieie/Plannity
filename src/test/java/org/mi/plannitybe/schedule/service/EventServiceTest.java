@@ -7,6 +7,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.*;
 import org.mi.plannitybe.exception.*;
+import org.mi.plannitybe.schedule.domain.EventDateTime;
 import org.mi.plannitybe.schedule.dto.CreateEventRequest;
 import org.mi.plannitybe.schedule.dto.EventResponse;
 import org.mi.plannitybe.schedule.entity.*;
@@ -47,59 +48,24 @@ class EventServiceTest {
     @Mock
     private TaskRepository taskRepository;
 
+    // 테스트 상수
+    private static final String DEFAULT_TITLE = "new event title";
+    private static final String DEFAULT_DESCRIPTION = "new event description";
+    private static final LocalDateTime DEFAULT_START_DATE = LocalDateTime.of(2025, 1, 1, 10, 0);
+    private static final LocalDateTime DEFAULT_END_DATE = LocalDateTime.of(2025, 1, 1, 12, 0);
+    private static final Long DEFAULT_EVENT_LIST_ID = 1L;
+    
     private String userId;
-    private Long eventListId;
-    private LocalDateTime startDate;
-    private LocalDateTime endDate;
-    private Boolean isAllDay;
-    private String title;
-    private String description;
-    private List<Long> taskIds;
-
 
     @BeforeEach
     void setUp() {
         userId = UUID.randomUUID().toString();
-        eventListId = 1L;
-        startDate = null;
-        endDate = null;
-        isAllDay = false;
-        title = "new event title";
-        description = "new event description";
-        taskIds = null;
     }
 
-    /*
-    <event 생성 조건>
-    1. eventList가 존재하고 소유자가 요청 userId와 동일해야 한다.
-    2. 종료날짜와 시작날짜는 모두 null이거나 모두 존재해야 한다. -> 서비스계층 X, DTO 책임 -> 통합테스트
-    3. (날짜가 모두 존재하면) 종료날짜는 시작날짜보다 미래이거나 같아야 한다. -> 서비스계층 X, DTO 책임 -> 통합테스트
-    4. 종일일정(isAllDay == true)이라면 종료날짜와 시작날짜는 반드시 값이 존재해야 한다.
-    5. 종일일정(isAllDay == true)이라면 종료날짜와 시작날짜가 하루 이상 차이가 나야 한다.
-    6. 종일일정(isAllDay == true)이라면 종료날짜와 시작날짜의 시간은 모두 자정이어야 한다.(00:00:00)
-    7. tasks에 값이 존재하면 각각의 task는 존재하는 task여야 한다.
-
-    <event 생성 성공 케이스>
-    - 회원 userId -> 조회한 EventList 객체의 소유자 id와 동일
-    - 존재하는 eventList id -> eventListRepository.findById 호출 시 EventList 객체 반환
-    - 조건을 만족하는 event
-    1. 시작날짜와 종료날짜 모두 null & 종일일정 false & title 입력 & tasks 없음
-    2. 시작날짜와 종료날짜 모두 존재 & 종일일정 false & title 입력 & tasks 없음
-    3. 시작날짜와 종료날짜 모두 자정이면서 하루 이상 차이 & 종일일정 true & title 입력 & task 없음
-    4. 시작날짜와 종료날짜 모두 null & 종일일정 false & title 입력 & tasks 있음
-
-    <event 생성 실패 케이스>
-    1. eventList가 존재하지 않으면 EventListNotFoundException이 발생한다.
-    2. eventList의 소유자 userId와 요청 userId가 다르면 UnauthorizedEventListAccessException이 발생한다.
-    3. 종일일정(isAllDay == true)이면서 종료날짜와 시작날짜가 null이면 InvalidAllDayEventDateException이 발생한다.
-    4. 종일일정(isAllDay == true)이면서 종료날짜와 시작날짜가 하루 이상 차이나지 않으면 InvalidAllDayEventDateException이 발생한다.
-    5. 종일일정(isAllDay == true)이면서 종료날짜 또는 시작날짜 시간이 자정이 아니면 InvalidAllDayEventDateException이 발생한다.
-    6. task에 값이 존재하는 경우, 각각의 task가 존재하지 않는 task면 TaskNotFoundException이 발생한다.
-    */
+    // ================ createEvent 테스트 ================
 
     @ParameterizedTest(name = "{index}: 종일일정 = {3} / {0}")
     @CsvSource({
-            "'시작날짜와 종료날짜 없음', , , false",
             "'시작날짜와 종료날짜 같음', '2025-01-01T00:00', '2025-01-01T00:00', false",
             "'시작날짜와 종료날짜 1분 차이 ', '2025-01-01T00:00', '2025-01-01T00:01', false",
             "'시작날짜와 종료날짜 23시간 59분 차이', '2025-01-01T00:00', '2025-01-01T23:59', false",
@@ -108,14 +74,12 @@ class EventServiceTest {
             "'시작날짜와 종료날짜 모두 자정, 하루 차이', '2025-01-01T00:00', '2025-01-02T00:00', true",
             "'시작날짜와 종료날짜 모두 자정, 한달 차이', '2025-01-01T00:00', '2025-02-01T00:00', true",
     })
-    @DisplayName("Event 생성 성공 - Tasks 없음")
-    void createEventOk_withoutTasks(String testDescription, LocalDateTime startDate, LocalDateTime endDate, Boolean isAllDay) {
+    @DisplayName("createEvent 성공 - Tasks 없음")
+    void createEvent_success_withoutTasks(String testDescription, LocalDateTime startDate, LocalDateTime endDate, Boolean isAllDay) {
         // GIVEN
-        CreateEventRequest createEventRequest = new CreateEventRequest(
-                eventListId, title, startDate, endDate, isAllDay, description, taskIds
-        );
-        setupExistingEventList(eventListId, userId);
-        mockEventRepositorySaveReturnsStubEvent();
+        CreateEventRequest createEventRequest = createEventRequest(startDate, endDate, isAllDay, null);
+        setupExistingEventList(DEFAULT_EVENT_LIST_ID, userId);
+        mockEventRepositorySaveReturns(createMockEvent(1L, userId));
 
         // WHEN
         eventService.createEvent(createEventRequest, userId);
@@ -123,7 +87,6 @@ class EventServiceTest {
         // THEN
         ArgumentCaptor<Event> eventCaptor = ArgumentCaptor.forClass(Event.class);
         verify(eventRepository).save(eventCaptor.capture());
-
         Event savedEvent = eventCaptor.getValue();
         verifySavedEvent(savedEvent, createEventRequest);
     }
@@ -131,15 +94,13 @@ class EventServiceTest {
 
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("validDatesAndAllDayValuesWithTasks")
-    @DisplayName("Event 생성 성공 - Tasks 있음")
-    void createEventOk_withTasks(String testDescription, LocalDateTime startDate, LocalDateTime endDate, Boolean isAllDay, List<Long> taskIds) {
+    @DisplayName("createEvent 성공 - Tasks 있음")
+    void createEvent_success_withTasks(String testDescription, LocalDateTime startDate, LocalDateTime endDate, Boolean isAllDay, List<Long> taskIds) {
         // GIVEN
-        CreateEventRequest createEventRequest = new CreateEventRequest(
-                eventListId, title, startDate, endDate, isAllDay, description, taskIds
-        );
-        setupExistingEventList(eventListId, userId);
+        CreateEventRequest createEventRequest = createEventRequest(startDate, endDate, isAllDay, taskIds);
+        setupExistingEventList(DEFAULT_EVENT_LIST_ID, userId);
         setupExistingTasks(taskIds, userId);
-        mockEventRepositorySaveReturnsStubEvent();
+        mockEventRepositorySaveReturns(createMockEvent(1L, userId));
 
         // WHEN
         eventService.createEvent(createEventRequest, userId);
@@ -147,76 +108,54 @@ class EventServiceTest {
         // THEN
         ArgumentCaptor<Event> eventCaptor = ArgumentCaptor.forClass(Event.class);
         verify(eventRepository).save(eventCaptor.capture());
-
         Event savedEvent = eventCaptor.getValue();
         verifySavedEvent(savedEvent, createEventRequest);
     }
 
-    // 이벤트 생성 실패 테스트
     @Test
-    @DisplayName("1. eventList가 존재하지 않으면 EventListNotFoundException이 발생한다.")
-    void createEventFailure_EventListNotFoundException() {
+    @DisplayName("createEvent 실패 - EventList가 존재하지 않음")
+    void createEvent_fail_eventListNotFound() {
         // GIVEN
-        CreateEventRequest createEventRequest = new CreateEventRequest(
-                eventListId, title, startDate, endDate, isAllDay, description, taskIds
-        );
-        setupNotExistingEventList(eventListId);
+        CreateEventRequest createEventRequest = createEventRequest(DEFAULT_START_DATE, DEFAULT_END_DATE, false, null);
+        setupNotExistingEventList(DEFAULT_EVENT_LIST_ID);
 
         // WHEN & THEN
         assertThrows(EventListNotFoundException.class, () -> eventService.createEvent(createEventRequest, userId));
     }
 
     @Test
-    @DisplayName("2. eventList의 소유자 userId와 요청 userId가 다르면 EventListAccessDeniedException이 발생한다.")
-    void createEventFailure_unauthorizedEventListAccessException() {
+    @DisplayName("createEvent 실패 - EventList 소유자가 다름")
+    void createEvent_fail_eventListAccessDenied() {
         // GIVEN
-        CreateEventRequest createEventRequest = new CreateEventRequest(
-                eventListId, title, startDate, endDate, isAllDay, description, taskIds
-        );
-        setupExistingEventList(eventListId, "different" + userId);
+        CreateEventRequest createEventRequest = createEventRequest(DEFAULT_START_DATE, DEFAULT_END_DATE, false, null);
+        setupExistingEventList(DEFAULT_EVENT_LIST_ID, "different" + userId);
 
         // WHEN & THEN
         assertThrows(EventListAccessDeniedException.class, () -> eventService.createEvent(createEventRequest, userId));
     }
 
-    @ParameterizedTest(name = "{index} : {0}")
-    @CsvSource({
-            "'종일일정이면서 종료날짜와 시작날짜가 null', , , true",
-            "'종일일정이면서 종료날짜와 시작날짜의 차이가 하루 미만', '2025-01-01T00:00', '2025-01-01T00:00', true",
-            "'종일일정이면서 종료날짜 또는 시작날짜 시간이 자정이 아님', '2025-01-01T01:00', '2025-01-02T01:00', true",
-    })
-    @DisplayName("3-5. 유효하지 않은 날짜 설정으로 InvalidAllDayEventDateException이 발생")
-    void createEventFailure_invalidAllDayEventDateException(String testDescription, LocalDateTime startDate, LocalDateTime endDate, Boolean isAllDay) {
-        // GIVEN
-        CreateEventRequest createEventRequest = new CreateEventRequest(
-                eventListId, title, startDate, endDate, isAllDay, description, taskIds
-        );
-        setupExistingEventList(eventListId, userId);
-
-        // WHEN & THEN
-        assertThrows(InvalidAllDayEventDateException.class, () -> eventService.createEvent(createEventRequest, userId));
-    }
-
-    @ParameterizedTest(name = "{index} : {0}")
+    @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("validDatesAndAllDayValuesWithTasks")
-    @DisplayName("6. task에 값이 존재하는 경우, 각각의 task가 존재하지 않는 task면 TaskNotFoundException이 발생한다.")
-    void createEventFailure_taskNotFoundException(String testDescription, LocalDateTime startDate, LocalDateTime endDate, Boolean isAllDay, List<Long> taskIds) {
+    @DisplayName("createEvent 실패 - Task가 존재하지 않음")
+    void createEvent_fail_taskNotFound(String testDescription, LocalDateTime startDate, LocalDateTime endDate, Boolean isAllDay, List<Long> taskIds) {
         // GIVEN
-        CreateEventRequest createEventRequest = new CreateEventRequest(
-                eventListId, title, startDate, endDate, isAllDay, null, taskIds
-        );
-        setupExistingEventList(eventListId, userId);
+        CreateEventRequest createEventRequest = createEventRequest(DEFAULT_START_DATE, DEFAULT_END_DATE, false, taskIds);
+        setupExistingEventList(DEFAULT_EVENT_LIST_ID, userId);
         setupNotExistingTasks(taskIds);
 
         // WHEN & THEN
         assertThrows(TaskNotFoundException.class, () -> eventService.createEvent(createEventRequest, userId));
     }
 
-    // Event 저장 후 반환값(Event 객체) 설정
-    private void mockEventRepositorySaveReturnsStubEvent() {
-        Event event = Event.builder()
-                .eventList(new EventList())
-                .build();
+    // ================ 헬퍼 메서드 ================
+    
+    private CreateEventRequest createEventRequest(LocalDateTime startDate, LocalDateTime endDate, Boolean isAllDay, List<Long> taskIds) {
+        return new CreateEventRequest(
+                DEFAULT_EVENT_LIST_ID, DEFAULT_TITLE, EventDateTime.of(startDate, endDate, isAllDay), DEFAULT_DESCRIPTION, taskIds
+        );
+    }
+    
+    private void mockEventRepositorySaveReturns(Event event) {
         given(eventRepository.save(any(Event.class))).willReturn(event);
     }
 
@@ -271,9 +210,9 @@ class EventServiceTest {
         // 두 객체 내부 필드 각각에 대해 값이 동일한지 확인
         assertThat(savedEvent.getEventList().getId()).isEqualTo(createEventRequest.getEventListId());
         assertThat(savedEvent.getTitle()).isEqualTo(createEventRequest.getTitle());
-        assertThat(savedEvent.getStartDate()).isEqualTo(createEventRequest.getStartDate());
-        assertThat(savedEvent.getEndDate()).isEqualTo(createEventRequest.getEndDate());
-        assertThat(savedEvent.getIsAllDay()).isEqualTo(createEventRequest.getIsAllDay());
+        assertThat(savedEvent.getStartDate()).isEqualTo(createEventRequest.getEventDateTime().getStartDate());
+        assertThat(savedEvent.getEndDate()).isEqualTo(createEventRequest.getEventDateTime().getEndDate());
+        assertThat(savedEvent.getIsAllDay()).isEqualTo(createEventRequest.getEventDateTime().getIsAllDay());
 
         // savedEvent의 EventTask 객체의 task id와 createEventRequest에 저장된 taskIds의 각 taskId가 동일한지 확인
         List<EventTask> savedEventTasks = savedEvent.getEventTasks();
@@ -285,15 +224,15 @@ class EventServiceTest {
     // Task가 존재할 때 Task id가 담긴 리스트와 유효한 날짜 케이스 매개변수 제공
     private static Stream<Arguments> validDatesAndAllDayValuesWithTasks() {
         return Stream.of(
-                Arguments.of("날짜없음", null, null, false, List.of(1L)),
                 Arguments.of("날짜지정", LocalDateTime.of(2025, 1, 1, 0, 0), LocalDateTime.of(2025, 1, 1, 0, 0), false, List.of(1L)),
                 Arguments.of("종일일정", LocalDateTime.of(2025, 1, 1, 0, 0), LocalDateTime.of(2025, 1, 2, 0, 0), true, List.of(1L))
         );
     }
 
-    // 일정 조회 테스트
+    // ================ getEvent 테스트 ================
+    
     @Test
-    @DisplayName("일정 id로 일정 상세 조회 성공")
+    @DisplayName("getEvent 성공")
     void getEvent_success() {
         // GIVEN
         Long eventId = 1L;
@@ -309,8 +248,8 @@ class EventServiceTest {
     }
 
     @Test
-    @DisplayName("존재하지 않는 일정 id로 조회 시 EventNotFoundException 발생")
-    void getEvent_notFound() {
+    @DisplayName("getEvent 실패 - Event가 존재하지 않음")
+    void getEvent_fail_eventNotFound() {
         Long eventId = 1L;
         given(eventRepository.findById(eventId)).willReturn(Optional.empty());
 
@@ -318,8 +257,8 @@ class EventServiceTest {
     }
 
     @Test
-    @DisplayName("소유자가 아닌 userId로 일정 조회 시 EventAccessDeniedException 발생")
-    void getEvent_accessDenied() {
+    @DisplayName("getEvent 실패 - Event 소유자가 다름")
+    void getEvent_fail_accessDenied() {
         Long eventId = 1L;
         Event mockEvent = createMockEvent(eventId, "different" + userId);
         given(eventRepository.findById(eventId)).willReturn(Optional.of(mockEvent));
@@ -330,7 +269,10 @@ class EventServiceTest {
     private Event createMockEvent(Long eventId, String userId) {
         return Event.builder()
                 .id(eventId)
-                .eventList(createMockEventList(eventListId, userId))
+                .eventList(createMockEventList(DEFAULT_EVENT_LIST_ID, userId))
+                .startDate(DEFAULT_START_DATE)
+                .endDate(DEFAULT_END_DATE)
+                .isAllDay(false)
                 .build();
     }
 }

@@ -86,13 +86,12 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-            "'날짜 없음, 종일일정 false', , , false, false",
             "'날짜 같음, 종일일정 false', '2024-01-01T10:00:00', '2024-01-01T10:00:00', false, false",
             "'시작날짜 < 종료날짜, 종일일정 false', '2024-01-01T10:00:00', '2024-01-01T12:00:00', false, false",
             "'종일일정 true, 자정, 하루 차이', '2024-01-01T00:00:00', '2024-01-02T00:00:00', true, false",
             "'종일일정 true, 자정, 여러 날 차이', '2024-01-01T00:00:00', '2024-01-05T00:00:00', true, false",
-            "'날짜 없음, Tasks 있음', , , false, true",
-            "'날짜 있음, Tasks 있음', '2024-01-01T10:00:00', '2024-01-01T12:00:00', false, true"
+            "'날짜 있음, Tasks 있음', '2024-01-01T10:00:00', '2024-01-01T12:00:00', false, true",
+            "'isAllDay null (기본값 false)', '2024-01-01T10:00:00', '2024-01-01T12:00:00', , false"
     })
     @DisplayName("createEvent 성공")
     void createEvent_success(String testDescription, LocalDateTime startDate, LocalDateTime endDate,
@@ -129,16 +128,17 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.event.id").exists())
                 .andExpect(jsonPath("$.event.title").value(DEFAULT_EVENT_TITLE))
                 .andExpect(jsonPath("$.event.eventListId").value(eventList.getId()))
-                .andExpect(jsonPath("$.event.isAllDay").value(isAllDay));
+                .andExpect(jsonPath("$.event.eventDateTime.isAllDay").value(isAllDay != null ? isAllDay : false));
     }
 
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-            "'한쪽 날짜만 존재 - startDate만', '2024-01-01T10:00:00', , false",
-            "'한쪽 날짜만 존재 - endDate만', , '2024-01-01T10:00:00', false",
-            "'종료날짜가 시작날짜보다 이전', '2024-01-02T10:00:00', '2024-01-01T10:00:00', false"
+            "'1초 차이', '2024-01-01T10:00:01', '2024-01-01T10:00:00', false",
+            "'1년 차이', '2025-01-01T10:00:00', '2024-01-01T10:00:00', false",
+            "'종일일정 1일 차이', '2024-01-02T00:00:00', '2024-01-01T00:00:00', true",
+            "'종일일정 1년 차이', '2025-01-01T10:00:00', '2024-01-01T10:00:00', true"
     })
-    @DisplayName("createEvent 실패 - 잘못된 날짜 조합")
+    @DisplayName("createEvent 실패 - 종료날짜가 시작날짜보다 이전")
     void createEvent_fail_invalidDates(String testDescription, LocalDateTime startDate,
                                        LocalDateTime endDate, Boolean isAllDay) throws Exception {
         // GIVEN
@@ -148,8 +148,8 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
 
         String requestJson = createEventRequestJson(
                 eventList.getId(), DEFAULT_EVENT_TITLE,
-                startDate != null ? startDate.format(DATE_TIME_FORMATTER) : null,
-                endDate != null ? endDate.format(DATE_TIME_FORMATTER) : null,
+                startDate.format(DATE_TIME_FORMATTER),
+                endDate.format(DATE_TIME_FORMATTER),
                 isAllDay, null
         );
 
@@ -162,19 +162,18 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
                 .andDo(print())
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("code").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("$.fieldErrors[*].field", hasItem("validDateCombination")));
+                .andExpect(jsonPath("$.fieldErrors[*].field", hasItem("eventDateTime.validDateCombination")));
     }
 
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-            "'종일일정이지만 날짜 없음', , , true",
-            "'종일일정이지만 하루 미만 차이', '2024-01-01T00:00:00', '2024-01-01T00:00:00', true",
-            "'종일일정이지만 시작 시간이 자정 아님', '2024-01-01T01:00:00', '2024-01-02T00:00:00', true",
-            "'종일일정이지만 종료 시간이 자정 아님', '2024-01-01T00:00:00', '2024-01-02T01:00:00', true"
+            "'종일일정이지만 하루 미만 차이', '2024-01-01T00:00:00', '2024-01-01T00:00:00'",
+            "'종일일정이지만 시작 시간이 자정 아님', '2024-01-01T01:00:00', '2024-01-02T00:00:00'",
+            "'종일일정이지만 종료 시간이 자정 아님', '2024-01-01T00:00:00', '2024-01-02T01:00:00'"
     })
     @DisplayName("createEvent 실패 - 종일일정 날짜 검증")
     void createEvent_fail_allDayDateValidation(String testDescription, LocalDateTime startDate,
-                                               LocalDateTime endDate, Boolean isAllDay) throws Exception {
+                                               LocalDateTime endDate) throws Exception {
         // GIVEN
         User user = createTestUser();
         EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
@@ -182,9 +181,9 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
 
         String requestJson = createEventRequestJson(
                 eventList.getId(), DEFAULT_EVENT_TITLE,
-                startDate != null ? startDate.format(DATE_TIME_FORMATTER) : null,
-                endDate != null ? endDate.format(DATE_TIME_FORMATTER) : null,
-                isAllDay, null
+                startDate.format(DATE_TIME_FORMATTER),
+                endDate.format(DATE_TIME_FORMATTER),
+                true, null
         );
 
         // WHEN & THEN
@@ -196,7 +195,7 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
                 .andDo(print())
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("code").value("VALIDATION_FAILED"))
-                .andExpect(jsonPath("message").exists());
+                .andExpect(jsonPath("$.fieldErrors[*].field", hasItem("eventDateTime.validAllDayConditions")));
     }
 
     @Test
@@ -205,10 +204,10 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         // GIVEN
         User user = createTestUser();
         String accessToken = createJwtToken(user);
-        Long nonExistentEventListId = 99999L;
+        Long nonExistentEventListId = getNonExistentEventListId();
 
         String requestJson = createEventRequestJson(
-                nonExistentEventListId, DEFAULT_EVENT_TITLE, null, null, false, null
+                nonExistentEventListId, DEFAULT_EVENT_TITLE, TEST_START_DATE.format(DATE_TIME_FORMATTER), TEST_END_DATE.format(DATE_TIME_FORMATTER), false, null
         );
 
         // WHEN & THEN
@@ -234,7 +233,7 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         String otherUserToken = createJwtToken(otherUser);
 
         String requestJson = createEventRequestJson(
-                ownerEventList.getId(), DEFAULT_EVENT_TITLE, null, null, false, null
+                ownerEventList.getId(), DEFAULT_EVENT_TITLE, TEST_START_DATE.format(DATE_TIME_FORMATTER), TEST_END_DATE.format(DATE_TIME_FORMATTER), false, null
         );
 
         // WHEN & THEN
@@ -251,15 +250,16 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
 
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-            "'eventListId null', , 'Test Event', false, 'eventListId'",
-            "'title null', '1', , false, 'title'",
-            "'title 빈 문자열', '1', '', false, 'title'",
-            "'title 공백만', '1', '   ', false, 'title'",
-            "'isAllDay null', '1', 'Test Event', , 'isAllDay'"
+            "'eventListId null', , 'Test Event', '2024-01-01T10:00:00', '2024-01-01T12:00:00', false, 'eventListId'",
+            "'title null', '1', , '2024-01-01T10:00:00', '2024-01-01T12:00:00', false, 'title'",
+            "'title 빈 문자열', '1', '', '2024-01-01T10:00:00', '2024-01-01T12:00:00', false, 'title'",
+            "'title 공백만', '1', '   ', '2024-01-01T10:00:00', '2024-01-01T12:00:00', false, 'title'",
+            "'startDate null', '1', 'Test Event', , '2024-01-01T12:00:00', false, 'eventDateTime.startDate'",
+            "'endDate null', '1', 'Test Event', '2024-01-01T10:00:00', , false, 'eventDateTime.endDate'"
     })
     @DisplayName("createEvent 실패 - 필수 필드 누락")
     void createEvent_fail_requiredFields(String testDescription, String eventListId,
-                                         String title, String isAllDay, String expectedField) throws Exception {
+                                         String title, String startDate, String endDate, String isAllDay, String expectedField) throws Exception {
         // GIVEN
         User user = createTestUser();
         EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
@@ -269,13 +269,9 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         Long actualEventListId = eventListId != null ? eventList.getId() : null;
         Boolean actualIsAllDay = isAllDay != null ? Boolean.valueOf(isAllDay) : null;
 
-        System.out.println("=== eventListId : " + eventListId);
-        System.out.println("=== title : " + title);
-
         String requestJson = createEventRequestJson(
-                actualEventListId, title, null, null, actualIsAllDay, null
+                actualEventListId, title, startDate, endDate, actualIsAllDay, null
         );
-        System.out.println("=== json : " + requestJson);
 
         // WHEN & THEN
         mockMvc.perform(post("/events")
@@ -297,9 +293,9 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
         String accessToken = createJwtToken(user);
 
-        List<Long> nonExistentTaskIds = List.of(99999L);
+        List<Long> nonExistentTaskIds = List.of(getNonExistentTaskId());
         String requestJson = createEventRequestJson(
-                eventList.getId(), DEFAULT_EVENT_TITLE, null, null, false, nonExistentTaskIds
+                eventList.getId(), DEFAULT_EVENT_TITLE, TEST_START_DATE.format(DATE_TIME_FORMATTER), TEST_END_DATE.format(DATE_TIME_FORMATTER), false, nonExistentTaskIds
         );
 
         // WHEN & THEN
@@ -327,7 +323,7 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
 
         List<Long> otherUserTaskIds = List.of(otherUserTask.getId());
         String requestJson = createEventRequestJson(
-                eventList.getId(), DEFAULT_EVENT_TITLE, null, null, false, otherUserTaskIds
+                eventList.getId(), DEFAULT_EVENT_TITLE, TEST_START_DATE.format(DATE_TIME_FORMATTER), TEST_END_DATE.format(DATE_TIME_FORMATTER), false, otherUserTaskIds
         );
 
         // WHEN & THEN
@@ -350,7 +346,7 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
 
         String requestJson = createEventRequestJson(
-                eventList.getId(), DEFAULT_EVENT_TITLE, null, null, false, null
+                eventList.getId(), DEFAULT_EVENT_TITLE, TEST_START_DATE.format(DATE_TIME_FORMATTER), TEST_END_DATE.format(DATE_TIME_FORMATTER), false, null
         );
 
         // WHEN & THEN
@@ -365,15 +361,15 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @ValueSource(strings = {
-            "{\"eventListId\":1,\"title\":\"Test\",\"isAllDay\":false,\"startDate\":\"invalid-date\"}",
-            "{\"eventListId\":1,\"title\":\"Test\",\"isAllDay\":false,\"startDate\":\"2024-13-01T00:00:00\"}",
-            "{\"eventListId\":1,\"title\":\"Test\",\"isAllDay\":false,\"startDate\":\"2024/01/01 10:00:00\"}",
-            "{\"eventListId\":\"invalid-id\",\"title\":\"Test\",\"isAllDay\":false}",
-            "{\"eventListId\":1,\"title\":\"Test\",\"isAllDay\":\"invalid-allDay\"}",
-            "{\"eventListId\":1,\"title\":\"Test\",\"isAllDay:false}",
-            "{\"eventListId\":1,\"title\":\"Test\",\"isAllDay\"false}",
-            "{\"eventListId\":1,\"title\":\"Test\",isAllDay:false}",
-            "{\"eventListId\":1,\"title\":\"Test\"\"isAllDay\":false}"
+            "{\"eventListId\":1,\"title\":\"Test\",\"eventDateTime\":{\"startDate\":\"invalid-date\",\"endDate\":\"2024-01-01T12:00:00\",\"isAllDay\":false}}",
+            "{\"eventListId\":1,\"title\":\"Test\",\"eventDateTime\":{\"startDate\":\"2024-13-01T00:00:00\",\"endDate\":\"2024-01-01T12:00:00\",\"isAllDay\":false}}",
+            "{\"eventListId\":1,\"title\":\"Test\",\"eventDateTime\":{\"startDate\":\"2024/01/01 10:00:00\",\"endDate\":\"2024-01-01T12:00:00\",\"isAllDay\":false}}",
+            "{\"eventListId\":\"invalid-id\",\"title\":\"Test\",\"eventDateTime\":{\"startDate\":\"2024-01-01T10:00:00\",\"endDate\":\"2024-01-01T12:00:00\",\"isAllDay\":false}}",
+            "{\"eventListId\":1,\"title\":\"Test\",\"eventDateTime\":{\"startDate\":\"2024-01-01T10:00:00\",\"endDate\":\"2024-01-01T12:00:00\",\"isAllDay\":\"invalid-allDay\"}}",
+            "{\"eventListId\":1,\"title\":\"Test\",\"eventDateTime\":{\"startDate\":\"2024-01-01T10:00:00\",\"endDate\":\"2024-01-01T12:00:00\",\"isAllDay:false}}",
+            "{\"eventListId\":1,\"title\":\"Test\",\"eventDateTime\":{\"startDate\":\"2024-01-01T10:00:00\",\"endDate\":\"2024-01-01T12:00:00\",\"isAllDay\"false}}",
+            "{\"eventListId\":1,\"title\":\"Test\",\"eventDateTime\":{\"startDate\":\"2024-01-01T10:00:00\",\"endDate\":\"2024-01-01T12:00:00\",isAllDay:false}}",
+            "{\"eventListId\":1,\"title\":\"Test\"\"eventDateTime\":{\"startDate\":\"2024-01-01T10:00:00\",\"endDate\":\"2024-01-01T12:00:00\",\"isAllDay\":false}}"
     })
     @ParameterizedTest(name = "{0}")
     @DisplayName("createEvent 실패 - JSON 파싱 불가")
@@ -420,9 +416,9 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.id").value(savedEvent.getId()))
                 .andExpect(jsonPath("$.eventListId").value(savedEventList.getId()))
                 .andExpect(jsonPath("$.title").value(savedEvent.getTitle()))
-                .andExpect(jsonPath("$.startDate").value(savedEvent.getStartDate().format(DATE_TIME_FORMATTER)))
-                .andExpect(jsonPath("$.endDate").value(savedEvent.getEndDate().format(DATE_TIME_FORMATTER)))
-                .andExpect(jsonPath("$.isAllDay").value(savedEvent.getIsAllDay()))
+                .andExpect(jsonPath("$.eventDateTime.startDate").value(savedEvent.getStartDate().format(DATE_TIME_FORMATTER)))
+                .andExpect(jsonPath("$.eventDateTime.endDate").value(savedEvent.getEndDate().format(DATE_TIME_FORMATTER)))
+                .andExpect(jsonPath("$.eventDateTime.isAllDay").value(savedEvent.getIsAllDay()))
                 .andExpect(jsonPath("$.description").value(savedEvent.getDescription()))
                 .andExpect(jsonPath("$.taskIds").isArray());
     }
@@ -559,6 +555,16 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
                 .orElse(1L);
     }
 
+    private Long getNonExistentEventListId() {
+        // 현재 시간을 기반으로 존재하지 않을 만한 큰 ID 생성
+        return System.currentTimeMillis() + 999999L;
+    }
+
+    private Long getNonExistentTaskId() {
+        // 현재 시간을 기반으로 존재하지 않을 만한 큰 ID 생성
+        return System.currentTimeMillis() + 888888L;
+    }
+
     private TaskList createTaskList(User user, String name) {
         TaskList taskList = TaskList.builder()
                 .user(user)
@@ -593,15 +599,27 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         if (title != null) {
             json.append("\"title\":\"").append(title).append("\",");
         }
-        if (startDate != null) {
-            json.append("\"startDate\":\"").append(startDate).append("\",");
+        
+        // eventDateTime 객체로 중첩 구조 생성
+        if (startDate != null || endDate != null || isAllDay != null) {
+            json.append("\"eventDateTime\":{");
+            if (startDate != null) {
+                json.append("\"startDate\":\"").append(startDate).append("\",");
+            }
+            if (endDate != null) {
+                json.append("\"endDate\":\"").append(endDate).append("\",");
+            }
+            if (isAllDay != null) {
+                json.append("\"isAllDay\":").append(isAllDay);
+            } else {
+                // 마지막 콤마 제거가 필요한 경우
+                if (json.charAt(json.length() - 1) == ',') {
+                    json.setLength(json.length() - 1);
+                }
+            }
+            json.append("},");
         }
-        if (endDate != null) {
-            json.append("\"endDate\":\"").append(endDate).append("\",");
-        }
-        if (isAllDay != null) {
-            json.append("\"isAllDay\":").append(isAllDay).append(",");
-        }
+        
         json.append("\"description\":\"").append(DEFAULT_DESCRIPTION).append("\"");
 
         if (taskIds != null && !taskIds.isEmpty()) {
