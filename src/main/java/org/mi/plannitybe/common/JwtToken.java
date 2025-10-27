@@ -1,4 +1,4 @@
-package org.mi.plannitybe.jwt;
+package org.mi.plannitybe.common;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

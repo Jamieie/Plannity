@@ -1,8 +1,9 @@
-package org.mi.plannitybe.jwt;
+package org.mi.plannitybe.config;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mi.plannitybe.common.JwtToken;
 import org.mi.plannitybe.exception.InvalidTokenException;
 import org.mi.plannitybe.user.dto.CustomUserDetails;
 import org.mi.plannitybe.user.type.UserRoleType;

@@ -1,6 +1,9 @@
 package org.mi.plannitybe.config;
 
 import jakarta.servlet.http.HttpServletRequest;
+import org.hibernate.boot.model.naming.Identifier;
+import org.hibernate.boot.model.naming.PhysicalNamingStrategy;
+import org.hibernate.engine.jdbc.env.spi.JdbcEnvironment;
 import org.mi.plannitybe.user.dto.CustomUserDetails;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,11 +14,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.Locale;
 import java.util.Optional;
 
 @Configuration
 @EnableJpaAuditing
-public class AuditConfig {
+public class JpaConfig {
 
     private static final String SYSTEM_AUDITOR = "SYSTEM";
     private static final String ANONYMOUS_AUDITOR = "ANONYMOUS";
@@ -53,6 +57,11 @@ public class AuditConfig {
         };
     }
 
+    @Bean
+    public PhysicalNamingStrategy physicalNamingStrategy() {
+        return new SnakeCasePhysicalNamingStrategy();
+    }
+
     private boolean isSignupRequest() {
         ServletRequestAttributes attributes =
                 (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
@@ -67,5 +76,61 @@ public class AuditConfig {
         }
 
         return false;
+    }
+
+    // Inner class로 SnakeCasePhysicalNamingStrategy 구현
+    public static class SnakeCasePhysicalNamingStrategy implements PhysicalNamingStrategy {
+
+        @Override
+        public Identifier toPhysicalCatalogName(Identifier identifier, JdbcEnvironment jdbcEnvironment) {
+            return apply(identifier);
+        }
+
+        @Override
+        public Identifier toPhysicalSchemaName(Identifier identifier, JdbcEnvironment jdbcEnvironment) {
+            return apply(identifier);
+        }
+
+        @Override
+        public Identifier toPhysicalTableName(Identifier identifier, JdbcEnvironment jdbcEnvironment) {
+            return apply(identifier);
+        }
+
+        @Override
+        public Identifier toPhysicalSequenceName(Identifier identifier, JdbcEnvironment jdbcEnvironment) {
+            return apply(identifier);
+        }
+
+        @Override
+        public Identifier toPhysicalColumnName(Identifier identifier, JdbcEnvironment jdbcEnvironment) {
+            return apply(identifier);
+        }
+
+        private Identifier apply(Identifier identifier) {
+            if (identifier == null) {
+                return null;
+            }
+            
+            String name = identifier.getText();
+            String snakeCaseName = camelCaseToSnakeCase(name);
+            return Identifier.toIdentifier(snakeCaseName);
+        }
+
+        private String camelCaseToSnakeCase(String name) {
+            final StringBuilder result = new StringBuilder();
+            result.append(name.substring(0, 1).toLowerCase(Locale.ROOT));
+            
+            for (int i = 1; i < name.length(); i++) {
+                final char c = name.charAt(i);
+                if (Character.isUpperCase(c)) {
+                    result.append('_');
+                    result.append(Character.toLowerCase(c));
+                } else {
+                    result.append(c);
+                }
+            }
+            
+            return result.toString();
+        }
     }
 }

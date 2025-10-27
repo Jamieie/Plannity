@@ -3,8 +3,6 @@ package org.mi.plannitybe.config;
 import lombok.RequiredArgsConstructor;
 import org.mi.plannitybe.exception.handler.CustomAccessDeniedHandler;
 import org.mi.plannitybe.exception.handler.CustomAuthenticationEntryPoint;
-import org.mi.plannitybe.jwt.JwtAuthenticationFilter;
-import org.mi.plannitybe.jwt.JwtTokenProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;

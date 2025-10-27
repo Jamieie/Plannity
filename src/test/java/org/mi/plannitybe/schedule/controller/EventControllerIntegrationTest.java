@@ -7,7 +7,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.mi.plannitybe.integration.BaseIntegrationTest;
 import org.mi.plannitybe.integration.UserSetUp;
-import org.mi.plannitybe.jwt.JwtTokenProvider;
+import org.mi.plannitybe.config.JwtTokenProvider;
 import org.mi.plannitybe.schedule.entity.Event;
 import org.mi.plannitybe.schedule.entity.EventList;
 import org.mi.plannitybe.schedule.repository.EventListRepository;

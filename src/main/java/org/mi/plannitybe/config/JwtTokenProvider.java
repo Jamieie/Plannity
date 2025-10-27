@@ -1,9 +1,10 @@
-package org.mi.plannitybe.jwt;
+package org.mi.plannitybe.config;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import lombok.extern.slf4j.Slf4j;
+import org.mi.plannitybe.common.JwtToken;
 import org.mi.plannitybe.exception.ExpiredTokenException;
 import org.mi.plannitybe.exception.InvalidTokenException;
 import org.mi.plannitybe.user.dto.CustomUserDetails;

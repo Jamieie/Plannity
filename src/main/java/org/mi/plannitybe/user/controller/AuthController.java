@@ -4,7 +4,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.mi.plannitybe.exception.EmailAlreadyExistsException;
-import org.mi.plannitybe.jwt.JwtToken;
+import org.mi.plannitybe.common.JwtToken;
 import org.mi.plannitybe.user.dto.LoginRequest;
 import org.mi.plannitybe.user.dto.SignUpRequest;
 import org.mi.plannitybe.user.service.AuthService;

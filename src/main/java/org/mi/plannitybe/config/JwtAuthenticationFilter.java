@@ -1,4 +1,4 @@
-package org.mi.plannitybe.jwt;
+package org.mi.plannitybe.config;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

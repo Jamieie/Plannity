@@ -2,10 +2,10 @@ package org.mi.plannitybe.user.controller;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mi.plannitybe.config.SecurityConfig;
 import org.mi.plannitybe.exception.handler.CustomAccessDeniedHandler;
 import org.mi.plannitybe.exception.handler.CustomAuthenticationEntryPoint;
-import org.mi.plannitybe.jwt.JwtTokenProvider;
+import org.mi.plannitybe.config.JwtTokenProvider;
+import org.mi.plannitybe.config.SecurityConfig;
 import org.mi.plannitybe.user.service.AuthService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
