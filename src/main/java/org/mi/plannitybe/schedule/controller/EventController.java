@@ -6,10 +6,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.mi.plannitybe.schedule.dto.CreateEventRequest;
-import org.mi.plannitybe.schedule.dto.EventCalendarRequest;
-import org.mi.plannitybe.schedule.dto.EventCalendarResponse;
-import org.mi.plannitybe.schedule.dto.EventResponse;
+import org.mi.plannitybe.schedule.dto.*;
 import org.mi.plannitybe.schedule.service.EventService;
 import org.mi.plannitybe.user.dto.CustomUserDetails;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -50,12 +47,24 @@ public class EventController {
     }
 
     @GetMapping
-    public ResponseEntity<List<EventCalendarResponse>> getEventsForCalendar(
+    public ResponseEntity<?> getEventsForCalendar(
             @Valid EventCalendarRequest eventCalendarRequest,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         
         String userId = userDetails.getId();
         List<EventCalendarResponse> events = eventService.getEventsForCalendar(eventCalendarRequest.getFrom(), eventCalendarRequest.getTo(), userId);
         return ResponseEntity.ok(events);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateEvent(@PathVariable("id") @Min(1) Long eventId,
+                                         @RequestBody @Valid UpdateEventRequest updateEventRequest,
+                                         @AuthenticationPrincipal CustomUserDetails userDetails) {
+        String userId = userDetails.getId();
+        EventResponse eventResponse = eventService.updateEvent(eventId, updateEventRequest, userId);
+        return ResponseEntity.status(HttpStatus.OK).body(Map.of(
+                "event", eventResponse,
+                "message", "일정이 수정되었습니다."
+        ));
     }
 }

@@ -8,6 +8,7 @@ import org.mi.plannitybe.common.entity.base.BaseEntity;
 @Entity
 @Table(name = "event_task")
 @Getter
+@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class EventTask extends BaseEntity {
 

@@ -9,7 +9,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
+import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
+import org.springframework.validation.method.MethodValidationResult;
 import org.springframework.validation.method.ParameterValidationResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -52,11 +54,12 @@ public class GlobalExceptionHandler {
 
     // 요청 파라미터 유효성 검사 실패 처리 (400)
     @ExceptionHandler(HandlerMethodValidationException.class)
-    public ResponseEntity<?> handleHandlerValidation(HandlerMethodValidationException ex) {
-
+    public ResponseEntity<?> handleHandlerMethodValidationException(HandlerMethodValidationException ex) {
         List<Map<String, String>> fieldErrors = new ArrayList<>();
+
+        // 케이스 1: ParameterValidationResult - 메서드 파라미터 검증 오류
         for (ParameterValidationResult result : ex.getValueResults()) {
-            String parameterName = result.getMethodParameter().getParameterName();  // 유효성 검사 실패한 파라미터
+            String parameterName = result.getMethodParameter().getParameterName();
             result.getResolvableErrors().forEach(error ->
                     fieldErrors.add(Map.of(
                             "field", parameterName,
@@ -65,12 +68,22 @@ public class GlobalExceptionHandler {
             );
         }
 
+        // 케이스 2: 기타 모든 검증 오류 (FieldError 등)
+        ex.getAllErrors().stream()
+                .filter(error -> !(error instanceof MethodValidationResult)) // 중복 방지
+                .forEach(error -> {
+                    String fieldName = (error instanceof FieldError fe) ? fe.getField() : error.getClass().getSimpleName();
+                    String message = error.getDefaultMessage();
+                    fieldErrors.add(Map.of("field", fieldName, "message", message));
+                });
+
         return ResponseEntity
-                .status(HttpStatus.BAD_REQUEST) // 400
+                .status(HttpStatus.BAD_REQUEST)
                 .body(Map.of(
                         "code", "VALIDATION_FAILED",
                         "fieldErrors", fieldErrors
                 ));
+
     }
 
     // 클라이언트 요청 데이터 형식 오류 처리 (400)

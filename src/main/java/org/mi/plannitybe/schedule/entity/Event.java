@@ -49,30 +49,64 @@ public class Event extends BaseEntity {
     @Comment("설명")
     private String description;
 
-    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "event", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
     @Builder.Default
     private List<EventTask> eventTasks = new ArrayList<>();
 
-    public void addEventTask(EventTask eventTask) {
-        eventTasks.add(eventTask);
+    public void addTask(Task task) {
+        if (hasTask(task)) {
+            return;
+        }
+
+        EventTask eventTask = EventTask.builder()
+                .event(this)
+                .task(task)
+                .build();
+        this.eventTasks.add(eventTask);
     }
 
-    public void update(String title, LocalDateTime startDate, LocalDateTime endDate,
-                       Boolean isAllDay, String description) {
-        this.title = title;
-        this.startDate = startDate;
-        this.endDate = endDate;
-        this.isAllDay = isAllDay;
-        this.description = description;
+    private boolean hasTask(Task task) {
+        return this.eventTasks.stream()
+                .anyMatch(eventTask -> Objects.equals(eventTask.getTask().getId(), task.getId()));
+    }
+
+    public void removeTask(Task task) {
+        this.eventTasks.stream()
+                .filter(eventTask -> Objects.equals(eventTask.getTask().getId(), task.getId()))
+                .findFirst()
+                .ifPresent(eventTask -> {
+                    this.eventTasks.remove(eventTask);
+                    eventTask.setEvent(null);  // 양방향 연관관계 동기화
+                });
     }
 
     public EventDateTime getEventDateTime() {
         return EventDateTime.of(startDate, endDate, isAllDay);
     }
 
+    public void updateEventList(EventList eventList) {
+        if (eventList != null) {
+            this.eventList = eventList;
+        }
+    }
+
+    public void updateTitle(String title) {
+        if (title != null && !title.trim().isEmpty()) {
+            this.title = title;
+        }
+    }
+
     public void updateFromEventDateTime(EventDateTime eventDateTime) {
-        this.startDate = eventDateTime.getStartDate();
-        this.endDate = eventDateTime.getEndDate();
-        this.isAllDay = eventDateTime.getIsAllDay();
+        if (eventDateTime != null) {
+            this.startDate = eventDateTime.getStartDate();
+            this.endDate = eventDateTime.getEndDate();
+            this.isAllDay = eventDateTime.getIsAllDay();
+        }
+    }
+
+    public void updateDescription(String description) {
+        if (description != null) {
+            this.description = description;
+        }
     }
 }

@@ -3,6 +3,7 @@ package org.mi.plannitybe.schedule.dto;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.mi.plannitybe.schedule.domain.EventDateTime;
 
 import java.time.LocalDateTime;
 
@@ -13,17 +14,20 @@ public class EventCalendarResponse {
     private Long eventId;
     private Long eventListId;
     private String title;
-    private LocalDateTime startDate;
-    private LocalDateTime endDate;
-    private Boolean isAllDay;
+    private EventDateTime eventDateTime;
 
     public EventCalendarResponse(Long eventId, Long eventListId, String title, 
                                 LocalDateTime startDate, LocalDateTime endDate, Boolean isAllDay) {
         this.eventId = eventId;
         this.eventListId = eventListId;
         this.title = title;
-        this.startDate = startDate;
-        this.endDate = endDate;
-        this.isAllDay = isAllDay;
+        this.eventDateTime = EventDateTime.of(startDate, endDate, isAllDay);
+    }
+
+    public EventCalendarResponse(Long eventId, Long eventListId, String title, EventDateTime eventDateTime) {
+        this.eventId = eventId;
+        this.eventListId = eventListId;
+        this.title = title;
+        this.eventDateTime = eventDateTime;
     }
 }

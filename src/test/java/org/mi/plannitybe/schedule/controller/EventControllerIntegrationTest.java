@@ -32,11 +32,14 @@ import org.mi.plannitybe.schedule.repository.TaskRepository;
 import org.mi.plannitybe.schedule.repository.TaskListRepository;
 import org.mi.plannitybe.schedule.entity.Task;
 import org.mi.plannitybe.schedule.entity.TaskList;
+import org.mi.plannitybe.schedule.entity.EventTask;
 import org.mi.plannitybe.schedule.type.TaskStatusType;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -670,10 +673,8 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(2))
                 .andExpect(jsonPath("$[0].eventId").value(event1.getId()))
                 .andExpect(jsonPath("$[0].title").value(event1Title))
-                .andExpect(jsonPath("$[0].isAllDay").value(false))
                 .andExpect(jsonPath("$[1].eventId").value(event2.getId()))
-                .andExpect(jsonPath("$[1].title").value(event2Title))
-                .andExpect(jsonPath("$[1].isAllDay").value(false));
+                .andExpect(jsonPath("$[1].title").value(event2Title));
     }
 
     @Test
@@ -707,13 +708,13 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(3))
                 .andExpect(jsonPath("$[0].eventId").value(eventEarlier.getId()))
                 .andExpect(jsonPath("$[0].title").value("Event Earlier"))
-                .andExpect(jsonPath("$[0].startDate").value("2024-04-05T09:00:00"))
+                .andExpect(jsonPath("$[0].eventDateTime.startDate").value("2024-04-05T09:00:00"))
                 .andExpect(jsonPath("$[1].eventId").value(eventMiddle.getId()))
                 .andExpect(jsonPath("$[1].title").value("Event Middle"))
-                .andExpect(jsonPath("$[1].startDate").value("2024-04-15T10:00:00"))
+                .andExpect(jsonPath("$[1].eventDateTime.startDate").value("2024-04-15T10:00:00"))
                 .andExpect(jsonPath("$[2].eventId").value(eventLater.getId()))
                 .andExpect(jsonPath("$[2].title").value("Event Later"))
-                .andExpect(jsonPath("$[2].startDate").value("2024-04-20T14:00:00"));
+                .andExpect(jsonPath("$[2].eventDateTime.startDate").value("2024-04-20T14:00:00"));
     }
 
     @ParameterizedTest(name = "{0}")
@@ -749,7 +750,7 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].eventId").value(eventInRange.getId()))
                 .andExpect(jsonPath("$[0].title").value("Event In Range"))
-                .andExpect(jsonPath("$[0].isAllDay").value(false));
+                .andExpect(jsonPath("$[0].eventDateTime.isAllDay").value(false));
     }
 
     @Test
@@ -920,6 +921,527 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
                 .andExpect(jsonPath("$[0].title").value("Event With Date"));
     }
 
+    // ================ updateEvent 테스트 ================
+
+    @Test
+    @DisplayName("updateEvent 성공 - 기존 EventTask 모두 제거")
+    void updateEvent_success_removeTasks() throws Exception {
+        // GIVEN - 사용자, EventList, Task, Event 생성
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        Task task1 = createTask(user);
+        Task task2 = createTask(user);
+        Event existingEvent = createEventWithTasks(eventList, "Event with Tasks", List.of(task1.getId(), task2.getId()));
+        String accessToken = createJwtToken(user);
+
+        String requestJson = createUpdateEventRequestJson(
+                eventList.getId(), "Updated Title",
+                TEST_START_DATE.format(DATE_TIME_FORMATTER),
+                TEST_END_DATE.format(DATE_TIME_FORMATTER),
+                false, List.of() // 빈 리스트로 모든 Task 제거
+        );
+
+        // WHEN - PUT /events/{id} 호출
+        mockMvc.perform(put("/events/{id}", existingEvent.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                // THEN - 성공 응답 검증
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.event.taskIds").isArray())
+                .andExpect(jsonPath("$.event.taskIds.length()").value(0));
+
+        // 실제 DB 변경 검증 - GET 요청으로 재조회
+        mockMvc.perform(get("/events/{id}", existingEvent.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskIds").isArray())
+                .andExpect(jsonPath("$.taskIds.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("updateEvent 성공 - 기존 EventTask 삭제 후 새 Task 연결 추가")
+    void updateEvent_success_replaceTasks() throws Exception {
+        // GIVEN - 사용자, EventList, Task들, Event 생성
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        Task oldTask1 = createTask(user);
+        Task oldTask2 = createTask(user);
+        Task newTask1 = createTask(user);
+        Task newTask2 = createTask(user);
+        Event existingEvent = createEventWithTasks(eventList, "Event with Old Tasks", List.of(oldTask1.getId(), oldTask2.getId()));
+        String accessToken = createJwtToken(user);
+
+        String requestJson = createUpdateEventRequestJson(
+                eventList.getId(), "Updated Title",
+                TEST_START_DATE.format(DATE_TIME_FORMATTER),
+                TEST_END_DATE.format(DATE_TIME_FORMATTER),
+                false, List.of(newTask1.getId(), newTask2.getId()) // 새로운 Task들로 교체
+        );
+
+        // WHEN - PUT /events/{id} 호출
+        mockMvc.perform(put("/events/{id}", existingEvent.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                // THEN - 성공 응답 검증
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.event.taskIds").isArray())
+                .andExpect(jsonPath("$.event.taskIds.length()").value(2))
+                .andExpect(jsonPath("$.event.taskIds[*]", hasItem(newTask1.getId().intValue())))
+                .andExpect(jsonPath("$.event.taskIds[*]", hasItem(newTask2.getId().intValue())));
+
+        // 실제 DB 변경 검증 - GET 요청으로 재조회
+        mockMvc.perform(get("/events/{id}", existingEvent.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskIds").isArray())
+                .andExpect(jsonPath("$.taskIds.length()").value(2))
+                .andExpect(jsonPath("$.taskIds[*]", hasItem(newTask1.getId().intValue())))
+                .andExpect(jsonPath("$.taskIds[*]", hasItem(newTask2.getId().intValue())))
+                .andExpect(jsonPath("$.taskIds[*]", not(hasItem(oldTask1.getId().intValue()))))
+                .andExpect(jsonPath("$.taskIds[*]", not(hasItem(oldTask2.getId().intValue()))));
+    }
+
+    @Test
+    @DisplayName("updateEvent 성공 - 기존 EventTask에 새 Task 연결 추가")
+    void updateEvent_success_addTasksToExisting() throws Exception {
+        // GIVEN - 사용자, EventList, Task들, Event 생성
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        Task existingTask = createTask(user);
+        Task newTask1 = createTask(user);
+        Task newTask2 = createTask(user);
+        Event existingEvent = createEventWithTasks(eventList, "Event with Existing Task", List.of(existingTask.getId()));
+        String accessToken = createJwtToken(user);
+
+        String requestJson = createUpdateEventRequestJson(
+                eventList.getId(), "Updated Title",
+                TEST_START_DATE.format(DATE_TIME_FORMATTER),
+                TEST_END_DATE.format(DATE_TIME_FORMATTER),
+                false, List.of(existingTask.getId(), newTask1.getId(), newTask2.getId()) // 기존 + 새 Task들
+        );
+
+        // WHEN - PUT /events/{id} 호출
+        mockMvc.perform(put("/events/{id}", existingEvent.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                // THEN - 성공 응답 검증
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.event.taskIds").isArray())
+                .andExpect(jsonPath("$.event.taskIds.length()").value(3))
+                .andExpect(jsonPath("$.event.taskIds[*]", hasItem(existingTask.getId().intValue())))
+                .andExpect(jsonPath("$.event.taskIds[*]", hasItem(newTask1.getId().intValue())))
+                .andExpect(jsonPath("$.event.taskIds[*]", hasItem(newTask2.getId().intValue())));
+
+        // 실제 DB 변경 검증 - GET 요청으로 재조회
+        mockMvc.perform(get("/events/{id}", existingEvent.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskIds").isArray())
+                .andExpect(jsonPath("$.taskIds.length()").value(3))
+                .andExpect(jsonPath("$.taskIds[*]", hasItem(existingTask.getId().intValue())))
+                .andExpect(jsonPath("$.taskIds[*]", hasItem(newTask1.getId().intValue())))
+                .andExpect(jsonPath("$.taskIds[*]", hasItem(newTask2.getId().intValue())));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "'모든 필드 수정', true, 'Updated Title', 'Updated Description', '2024-03-01T00:00:00', '2024-03-02T00:00:00', true, true",
+            "'title만 수정', false, 'Updated Title Only', , , , , false",
+            "'description만 수정', false, , 'Updated Description Only', , , , false",
+            "'eventDateTime만 수정', false, , , '2024-03-01T00:00:00', '2024-03-02T00:00:00', true, false"
+    })
+    @DisplayName("updateEvent 성공 - 필드별 수정")
+    void updateEvent_success_fieldUpdates(String testDescription, boolean updateAll, String newTitle, 
+                                         String newDescription, String newStartDate, String newEndDate, 
+                                         Boolean newIsAllDay, boolean updateTasks) throws Exception {
+        // GIVEN - 기존 Event 생성
+        User user = createTestUser();
+        EventList oldEventList = createEventList(user, "Old EventList");
+        EventList newEventList = createEventList(user, "New EventList");
+        Task oldTask = createTask(user);
+        Task newTask = createTask(user);
+        Event existingEvent = createEventWithTasks(oldEventList, "Original Title", List.of(oldTask.getId()));
+        String accessToken = createJwtToken(user);
+
+        // 원본 값들 저장
+        String originalTitle = existingEvent.getTitle();
+        String originalDescription = existingEvent.getDescription();
+        LocalDateTime originalStartDate = existingEvent.getStartDate();
+        LocalDateTime originalEndDate = existingEvent.getEndDate();
+        Boolean originalIsAllDay = existingEvent.getIsAllDay();
+        Long originalEventListId = existingEvent.getEventList().getId();
+
+        // 요청 JSON 생성
+        Long eventListId = updateAll ? newEventList.getId() : null;
+        List<Long> taskIds = updateTasks ? List.of(newTask.getId()) : null;
+        
+        String requestJson = createUpdateEventRequestJson(
+                eventListId, newTitle, newStartDate, newEndDate, newIsAllDay, taskIds, newDescription
+        );
+
+        // WHEN - PUT /events/{id} 호출
+        mockMvc.perform(put("/events/{id}", existingEvent.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                // THEN - 예상 값과 실제 값 검증
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.event.eventListId").value(updateAll ? newEventList.getId() : originalEventListId))
+                .andExpect(jsonPath("$.event.title").value(newTitle != null ? newTitle : originalTitle))
+                .andExpect(jsonPath("$.event.description").value(newDescription != null ? newDescription : originalDescription))
+                .andExpect(jsonPath("$.event.eventDateTime.startDate").value(
+                        newStartDate != null ? newStartDate : originalStartDate.format(DATE_TIME_FORMATTER)))
+                .andExpect(jsonPath("$.event.eventDateTime.endDate").value(
+                        newEndDate != null ? newEndDate : originalEndDate.format(DATE_TIME_FORMATTER)))
+                .andExpect(jsonPath("$.event.eventDateTime.isAllDay").value(
+                        newIsAllDay != null ? newIsAllDay : originalIsAllDay))
+                .andExpect(jsonPath("$.event.taskIds.length()").value(1))
+                .andExpect(jsonPath("$.event.taskIds[0]").value(updateTasks ? newTask.getId() : oldTask.getId()));
+
+        // "모든 필드 수정" 케이스에서만 실제 DB 변경 검증
+        if (updateAll) {
+            mockMvc.perform(get("/events/{id}", existingEvent.getId())
+                            .header("Authorization", "Bearer " + accessToken)
+                            .accept(MediaType.APPLICATION_JSON))
+                    .andDo(print())
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.eventListId").value(newEventList.getId()))
+                    .andExpect(jsonPath("$.title").value(newTitle))
+                    .andExpect(jsonPath("$.description").value(newDescription))
+                    .andExpect(jsonPath("$.eventDateTime.startDate").value(newStartDate))
+                    .andExpect(jsonPath("$.eventDateTime.endDate").value(newEndDate))
+                    .andExpect(jsonPath("$.eventDateTime.isAllDay").value(newIsAllDay))
+                    .andExpect(jsonPath("$.taskIds.length()").value(1))
+                    .andExpect(jsonPath("$.taskIds[0]").value(newTask.getId()));
+        }
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "'빈 문자열', ''",
+            "'공백 문자열', '   '",
+            "'여러 공백', '    '"
+    })
+    @DisplayName("updateEvent 성공 - description 공백/빈 문자열 처리")
+    void updateEvent_success_descriptionWhitespaceAndEmpty(String testDescription, String inputDescription) throws Exception {
+        // GIVEN
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        Event existingEvent = createEvent(eventList, "Original Title", "Original Description");
+        String accessToken = createJwtToken(user);
+
+        String requestJson = createPartialUpdateEventRequestJson("description", inputDescription);
+
+        // WHEN - PUT /events/{id} 호출
+        mockMvc.perform(put("/events/{id}", existingEvent.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                // THEN - 공백이 trim되어 빈 문자열로 저장
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.event.description").value(""));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "'공백 문자열', '   '",
+            "'빈 문자열', ''",
+            "'여러 공백', '    '"
+    })
+    @DisplayName("updateEvent 성공 - title 공백/빈 문자열 처리 (값 변경 안됨)")
+    void updateEvent_success_titleWhitespaceIgnored(String testDescription, String inputTitle) throws Exception {
+        // GIVEN
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        String originalTitle = "Original Title";
+        Event existingEvent = createEvent(eventList, originalTitle, "Original Description");
+        String accessToken = createJwtToken(user);
+
+        String requestJson = createPartialUpdateEventRequestJson("title", inputTitle);
+
+        // WHEN - PUT /events/{id} 호출
+        mockMvc.perform(put("/events/{id}", existingEvent.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                // THEN - 원본 title 값 유지 (변경되지 않음)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.event.title").value(originalTitle));
+    }
+
+    @Test
+    @DisplayName("updateEvent 성공 - 모든 필드 null 요청 (값 변경 없음)")
+    void updateEvent_success_allFieldsNull() throws Exception {
+        // GIVEN
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        Task task = createTask(user);
+        Event existingEvent = createEventWithTasks(eventList, "Original Title", List.of(task.getId()));
+        String accessToken = createJwtToken(user);
+
+        // 원본 값들 저장
+        String originalTitle = existingEvent.getTitle();
+        String originalDescription = existingEvent.getDescription();
+        LocalDateTime originalStartDate = existingEvent.getStartDate();
+        LocalDateTime originalEndDate = existingEvent.getEndDate();
+        Boolean originalIsAllDay = existingEvent.getIsAllDay();
+        Long originalEventListId = existingEvent.getEventList().getId();
+
+        String requestJson = "{}"; // 모든 필드 null
+
+        // WHEN - PUT /events/{id} 호출
+        mockMvc.perform(put("/events/{id}", existingEvent.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                // THEN - 모든 값이 원본 유지
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.event.eventListId").value(originalEventListId))
+                .andExpect(jsonPath("$.event.title").value(originalTitle))
+                .andExpect(jsonPath("$.event.description").value(originalDescription))
+                .andExpect(jsonPath("$.event.eventDateTime.startDate").value(originalStartDate.format(DATE_TIME_FORMATTER)))
+                .andExpect(jsonPath("$.event.eventDateTime.endDate").value(originalEndDate.format(DATE_TIME_FORMATTER)))
+                .andExpect(jsonPath("$.event.eventDateTime.isAllDay").value(originalIsAllDay))
+                .andExpect(jsonPath("$.event.taskIds.length()").value(1))
+                .andExpect(jsonPath("$.event.taskIds[0]").value(task.getId()));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({
+            "'종료날짜가 시작날짜보다 이전 - 날짜지정', '2024-01-02T10:00:00', '2024-01-01T10:00:00', false",
+            "'종료날짜가 시작날짜보다 이전 - 종일일정', '2024-01-02T00:00:00', '2024-01-01T00:00:00', true",
+            "'종일일정이지만 시작시간이 자정 아님', '2024-01-01T01:00:00', '2024-01-02T00:00:00', true",
+            "'종일일정이지만 종료시간이 자정 아님', '2024-01-01T00:00:00', '2024-01-02T01:00:00', true",
+            "'종일일정이지만 하루 미만 차이', '2024-01-01T00:00:00', '2024-01-01T00:00:00', true"
+    })
+    @DisplayName("updateEvent 실패 - 유효하지 않은 eventDateTime")
+    void updateEvent_fail_invalidEventDateTime(String testDescription, String startDate, String endDate, Boolean isAllDay) throws Exception {
+        // GIVEN
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        Event existingEvent = createEvent(eventList, "Original Title", "Original Description");
+        String accessToken = createJwtToken(user);
+
+        String requestJson = createUpdateEventRequestJson(
+                eventList.getId(), "Updated Title",
+                startDate, endDate, isAllDay, null
+        );
+
+        // WHEN & THEN
+        mockMvc.perform(put("/events/{id}", existingEvent.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+    }
+
+    @Test
+    @DisplayName("updateEvent 실패 - 존재하지 않는 eventId")
+    void updateEvent_fail_eventNotFound() throws Exception {
+        // GIVEN
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        String accessToken = createJwtToken(user);
+        Long nonExistentEventId = getNonExistentEventId();
+
+        String requestJson = createUpdateEventRequestJson(
+                eventList.getId(), "Updated Title",
+                TEST_START_DATE.format(DATE_TIME_FORMATTER),
+                TEST_END_DATE.format(DATE_TIME_FORMATTER),
+                false, null
+        );
+
+        // WHEN & THEN
+        mockMvc.perform(put("/events/{id}", nonExistentEventId)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("일정이 존재하지 않습니다."));
+    }
+
+    @Test
+    @DisplayName("updateEvent 실패 - 다른 사용자의 Event")
+    void updateEvent_fail_eventNotOwner() throws Exception {
+        // GIVEN - 두 명의 사용자 생성
+        User eventOwner = createTestUser();
+        User otherUser = createTestUser();
+
+        EventList ownerEventList = createEventList(eventOwner, DEFAULT_EVENTLIST_NAME);
+        Event ownerEvent = createEvent(ownerEventList, "Owner's Event", "Owner's Description");
+        
+        EventList otherUserEventList = createEventList(otherUser, DEFAULT_EVENTLIST_NAME);
+        String otherUserToken = createJwtToken(otherUser);
+
+        String requestJson = createUpdateEventRequestJson(
+                otherUserEventList.getId(), "Updated Title",
+                TEST_START_DATE.format(DATE_TIME_FORMATTER),
+                TEST_END_DATE.format(DATE_TIME_FORMATTER),
+                false, null
+        );
+
+        // WHEN & THEN
+        mockMvc.perform(put("/events/{id}", ownerEvent.getId())
+                        .header("Authorization", "Bearer " + otherUserToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("일정이 존재하지 않습니다."));
+    }
+
+    @Test
+    @DisplayName("updateEvent 실패 - 존재하지 않는 EventList")
+    void updateEvent_fail_eventListNotFound() throws Exception {
+        // GIVEN
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        Event existingEvent = createEvent(eventList, "Original Title", "Original Description");
+        String accessToken = createJwtToken(user);
+        Long nonExistentEventListId = getNonExistentEventListId();
+
+        String requestJson = createUpdateEventRequestJson(
+                nonExistentEventListId, "Updated Title",
+                TEST_START_DATE.format(DATE_TIME_FORMATTER),
+                TEST_END_DATE.format(DATE_TIME_FORMATTER),
+                false, null
+        );
+
+        // WHEN & THEN
+        mockMvc.perform(put("/events/{id}", existingEvent.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("EVENT_LIST_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("일정리스트가 존재하지 않습니다."));
+    }
+
+    @Test
+    @DisplayName("updateEvent 실패 - 다른 사용자의 EventList")
+    void updateEvent_fail_eventListNotOwner() throws Exception {
+        // GIVEN - 두 명의 사용자 생성
+        User eventOwner = createTestUser();
+        User otherUser = createTestUser();
+
+        EventList ownerEventList = createEventList(eventOwner, DEFAULT_EVENTLIST_NAME);
+        Event ownerEvent = createEvent(ownerEventList, "Owner's Event", "Owner's Description");
+        
+        EventList otherUserEventList = createEventList(otherUser, DEFAULT_EVENTLIST_NAME);
+        String ownerToken = createJwtToken(eventOwner);
+
+        String requestJson = createUpdateEventRequestJson(
+                otherUserEventList.getId(), "Updated Title", // 다른 사용자의 EventList 사용
+                TEST_START_DATE.format(DATE_TIME_FORMATTER),
+                TEST_END_DATE.format(DATE_TIME_FORMATTER),
+                false, null
+        );
+
+        // WHEN & THEN
+        mockMvc.perform(put("/events/{id}", ownerEvent.getId())
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("EVENT_LIST_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("일정리스트가 존재하지 않습니다."));
+    }
+
+    @Test
+    @DisplayName("updateEvent 실패 - 존재하지 않는 Task")
+    void updateEvent_fail_taskNotFound() throws Exception {
+        // GIVEN
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        Event existingEvent = createEvent(eventList, "Original Title", "Original Description");
+        String accessToken = createJwtToken(user);
+        Long nonExistentTaskId = getNonExistentTaskId();
+
+        String requestJson = createUpdateEventRequestJson(
+                eventList.getId(), "Updated Title",
+                TEST_START_DATE.format(DATE_TIME_FORMATTER),
+                TEST_END_DATE.format(DATE_TIME_FORMATTER),
+                false, List.of(nonExistentTaskId)
+        );
+
+        // WHEN & THEN
+        mockMvc.perform(put("/events/{id}", existingEvent.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("TASK_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("할일이 존재하지 않습니다."));
+    }
+
+    @Test
+    @DisplayName("updateEvent 실패 - 다른 사용자의 Task")
+    void updateEvent_fail_taskNotOwner() throws Exception {
+        // GIVEN - 두 명의 사용자 생성
+        User eventOwner = createTestUser();
+        User otherUser = createTestUser();
+
+        EventList ownerEventList = createEventList(eventOwner, DEFAULT_EVENTLIST_NAME);
+        Event ownerEvent = createEvent(ownerEventList, "Owner's Event", "Owner's Description");
+        Task otherUserTask = createTask(otherUser);
+        String ownerToken = createJwtToken(eventOwner);
+
+        String requestJson = createUpdateEventRequestJson(
+                ownerEventList.getId(), "Updated Title",
+                TEST_START_DATE.format(DATE_TIME_FORMATTER),
+                TEST_END_DATE.format(DATE_TIME_FORMATTER),
+                false, List.of(otherUserTask.getId()) // 다른 사용자의 Task 사용
+        );
+
+        // WHEN & THEN
+        mockMvc.perform(put("/events/{id}", ownerEvent.getId())
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(requestJson)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("TASK_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("할일이 존재하지 않습니다."));
+    }
+
     // 헬퍼 메서드
     private Event createEventWithDates(EventList eventList, String title, LocalDateTime startDate, LocalDateTime endDate) {
         Event event = Event.builder()
@@ -931,5 +1453,107 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
                 .description(DEFAULT_DESCRIPTION)
                 .build();
         return eventRepository.save(event);
+    }
+
+    private Event createEventWithTasks(EventList eventList, String title, List<Long> taskIds) {
+        Event event = Event.builder()
+                .eventList(eventList)
+                .title(title)
+                .startDate(TEST_START_DATE)
+                .endDate(TEST_END_DATE)
+                .isAllDay(false)
+                .description(DEFAULT_DESCRIPTION)
+                .build();
+        
+        Event savedEvent = eventRepository.save(event);
+        
+        // EventTask 연결 생성 (실제 서비스 로직처럼)
+        for (Long taskId : taskIds) {
+            Task task = taskRepository.findById(taskId).orElseThrow();
+            EventTask eventTask = EventTask.builder()
+                    .event(savedEvent)
+                    .task(task)
+                    .build();
+            savedEvent.getEventTasks().add(eventTask);
+        }
+        
+        return eventRepository.save(savedEvent);
+    }
+
+    private String createUpdateEventRequestJson(Long eventListId, String title,
+                                               String startDate, String endDate,
+                                               Boolean isAllDay, List<Long> taskIds) {
+        return createUpdateEventRequestJson(eventListId, title, startDate, endDate, isAllDay, taskIds, "Updated Description");
+    }
+
+    private String createUpdateEventRequestJson(Long eventListId, String title,
+                                               String startDate, String endDate,
+                                               Boolean isAllDay, List<Long> taskIds, String description) {
+        StringBuilder json = new StringBuilder("{");
+        boolean needsComma = false;
+
+        if (eventListId != null) {
+            json.append("\"eventListId\":").append(eventListId);
+            needsComma = true;
+        }
+        if (title != null) {
+            if (needsComma) json.append(",");
+            json.append("\"title\":\"").append(title).append("\"");
+            needsComma = true;
+        }
+        
+        // eventDateTime 객체로 중첩 구조 생성
+        boolean hasEventDateTime = (startDate != null || endDate != null || isAllDay != null);
+        if (hasEventDateTime) {
+            if (needsComma) json.append(",");
+            json.append("\"eventDateTime\":{");
+            if (startDate != null) {
+                json.append("\"startDate\":\"").append(startDate).append("\",");
+            }
+            if (endDate != null) {
+                json.append("\"endDate\":\"").append(endDate).append("\",");
+            }
+            if (isAllDay != null) {
+                json.append("\"isAllDay\":").append(isAllDay);
+            } else {
+                // 마지막 콤마 제거가 필요한 경우
+                if (json.charAt(json.length() - 1) == ',') {
+                    json.setLength(json.length() - 1);
+                }
+            }
+            json.append("}");
+            needsComma = true;
+        }
+        
+        if (description != null) {
+            if (needsComma) json.append(",");
+            json.append("\"description\":\"").append(description).append("\"");
+            needsComma = true;
+        }
+
+        if (taskIds != null) {
+            if (needsComma) json.append(",");
+            json.append("\"tasks\":[");
+            if (!taskIds.isEmpty()) {
+                json.append(taskIds.stream().map(String::valueOf).reduce((a, b) -> a + "," + b).orElse(""));
+            }
+            json.append("]");
+        }
+
+        json.append("}");
+        return json.toString();
+    }
+
+    private String createPartialUpdateEventRequestJson(String fieldName, String fieldValue) {
+        StringBuilder json = new StringBuilder("{");
+        
+        if ("title".equals(fieldName)) {
+            json.append("\"title\":\"").append(fieldValue).append("\"");
+        } else if ("description".equals(fieldName)) {
+            json.append("\"description\":\"").append(fieldValue).append("\"");
+        }
+        
+        json.append("}");
+        return json.toString();
     }
 }
