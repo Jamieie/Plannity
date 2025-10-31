@@ -208,16 +208,16 @@ class EventServiceTest {
     // 저장한 Event의 값과 넘겨준 값이 동일한지 확인하는 메소드
     private void verifySavedEvent(Event savedEvent, CreateEventRequest createEventRequest) {
         // 두 객체 내부 필드 각각에 대해 값이 동일한지 확인
-        assertThat(savedEvent.getEventList().getId()).isEqualTo(createEventRequest.getEventListId());
-        assertThat(savedEvent.getTitle()).isEqualTo(createEventRequest.getTitle());
-        assertThat(savedEvent.getStartDate()).isEqualTo(createEventRequest.getEventDateTime().getStartDate());
-        assertThat(savedEvent.getEndDate()).isEqualTo(createEventRequest.getEventDateTime().getEndDate());
-        assertThat(savedEvent.getIsAllDay()).isEqualTo(createEventRequest.getEventDateTime().getIsAllDay());
+        assertThat(savedEvent.getEventList().getId()).isEqualTo(createEventRequest.eventListId());
+        assertThat(savedEvent.getTitle()).isEqualTo(createEventRequest.title());
+        assertThat(savedEvent.getStartDate()).isEqualTo(createEventRequest.eventDateTime().getStartDate());
+        assertThat(savedEvent.getEndDate()).isEqualTo(createEventRequest.eventDateTime().getEndDate());
+        assertThat(savedEvent.getIsAllDay()).isEqualTo(createEventRequest.eventDateTime().getIsAllDay());
 
         // savedEvent의 EventTask 객체의 task id와 createEventRequest에 저장된 taskIds의 각 taskId가 동일한지 확인
         List<EventTask> savedEventTasks = savedEvent.getEventTasks();
         for (int i = 0; i < savedEventTasks.size(); i++) {
-            assertThat(savedEventTasks.get(i).getTask().getId()).isEqualTo(createEventRequest.getTaskIds().get(i));
+            assertThat(savedEventTasks.get(i).getTask().getId()).isEqualTo(createEventRequest.taskIds().get(i));
         }
     }
 

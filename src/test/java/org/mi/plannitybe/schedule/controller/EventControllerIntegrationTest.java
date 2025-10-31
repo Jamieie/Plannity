@@ -591,20 +591,27 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
     }
 
 
+    // 통합된 JSON 생성 메서드
     private String createEventRequestJson(Long eventListId, String title,
                                           String startDate, String endDate,
-                                          Boolean isAllDay, List<Long> taskIds) {
+                                          Boolean isAllDay, List<Long> taskIds, String description) {
         StringBuilder json = new StringBuilder("{");
+        boolean needsComma = false;
 
         if (eventListId != null) {
-            json.append("\"eventListId\":").append(eventListId).append(",");
+            json.append("\"eventListId\":").append(eventListId);
+            needsComma = true;
         }
         if (title != null) {
-            json.append("\"title\":\"").append(title).append("\",");
+            if (needsComma) json.append(",");
+            json.append("\"title\":\"").append(title).append("\"");
+            needsComma = true;
         }
-        
+
         // eventDateTime 객체로 중첩 구조 생성
-        if (startDate != null || endDate != null || isAllDay != null) {
+        boolean hasEventDateTime = (startDate != null || endDate != null || isAllDay != null);
+        if (hasEventDateTime) {
+            if (needsComma) json.append(",");
             json.append("\"eventDateTime\":{");
             if (startDate != null) {
                 json.append("\"startDate\":\"").append(startDate).append("\",");
@@ -620,19 +627,34 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
                     json.setLength(json.length() - 1);
                 }
             }
-            json.append("},");
+            json.append("}");
+            needsComma = true;
         }
-        
-        json.append("\"description\":\"").append(DEFAULT_DESCRIPTION).append("\"");
 
-        if (taskIds != null && !taskIds.isEmpty()) {
-            json.append(",\"tasks\":[");
-            json.append(taskIds.stream().map(String::valueOf).reduce((a, b) -> a + "," + b).orElse(""));
+        if (description != null) {
+            if (needsComma) json.append(",");
+            json.append("\"description\":\"").append(description).append("\"");
+            needsComma = true;
+        }
+
+        if (taskIds != null) {
+            if (needsComma) json.append(",");
+            json.append("\"taskIds\":[");
+            if (!taskIds.isEmpty()) {
+                json.append(taskIds.stream().map(String::valueOf).reduce((a, b) -> a + "," + b).orElse(""));
+            }
             json.append("]");
         }
 
         json.append("}");
         return json.toString();
+    }
+
+    // 기존 메서드들과의 호환성을 위한 오버로드 메서드들
+    private String createEventRequestJson(Long eventListId, String title,
+                                          String startDate, String endDate,
+                                          Boolean isAllDay, List<Long> taskIds) {
+        return createEventRequestJson(eventListId, title, startDate, endDate, isAllDay, taskIds, DEFAULT_DESCRIPTION);
     }
 
     // ================ getEventsForCalendar 테스트 ================
@@ -934,11 +956,11 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         Event existingEvent = createEventWithTasks(eventList, "Event with Tasks", List.of(task1.getId(), task2.getId()));
         String accessToken = createJwtToken(user);
 
-        String requestJson = createUpdateEventRequestJson(
+        String requestJson = createEventRequestJson(
                 eventList.getId(), "Updated Title",
                 TEST_START_DATE.format(DATE_TIME_FORMATTER),
                 TEST_END_DATE.format(DATE_TIME_FORMATTER),
-                false, List.of() // 빈 리스트로 모든 Task 제거
+                false, List.of(), "Updated Description" // 빈 리스트로 모든 Task 제거
         );
 
         // WHEN - PUT /events/{id} 호출
@@ -976,11 +998,11 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         Event existingEvent = createEventWithTasks(eventList, "Event with Old Tasks", List.of(oldTask1.getId(), oldTask2.getId()));
         String accessToken = createJwtToken(user);
 
-        String requestJson = createUpdateEventRequestJson(
+        String requestJson = createEventRequestJson(
                 eventList.getId(), "Updated Title",
                 TEST_START_DATE.format(DATE_TIME_FORMATTER),
                 TEST_END_DATE.format(DATE_TIME_FORMATTER),
-                false, List.of(newTask1.getId(), newTask2.getId()) // 새로운 Task들로 교체
+                false, List.of(newTask1.getId(), newTask2.getId()), "Updated Description" // 새로운 Task들로 교체
         );
 
         // WHEN - PUT /events/{id} 호출
@@ -1023,11 +1045,11 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         Event existingEvent = createEventWithTasks(eventList, "Event with Existing Task", List.of(existingTask.getId()));
         String accessToken = createJwtToken(user);
 
-        String requestJson = createUpdateEventRequestJson(
+        String requestJson = createEventRequestJson(
                 eventList.getId(), "Updated Title",
                 TEST_START_DATE.format(DATE_TIME_FORMATTER),
                 TEST_END_DATE.format(DATE_TIME_FORMATTER),
-                false, List.of(existingTask.getId(), newTask1.getId(), newTask2.getId()) // 기존 + 새 Task들
+                false, List.of(existingTask.getId(), newTask1.getId(), newTask2.getId()), "Updated Description" // 기존 + 새 Task들
         );
 
         // WHEN - PUT /events/{id} 호출
@@ -1090,7 +1112,7 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         Long eventListId = updateAll ? newEventList.getId() : null;
         List<Long> taskIds = updateTasks ? List.of(newTask.getId()) : null;
         
-        String requestJson = createUpdateEventRequestJson(
+        String requestJson = createEventRequestJson(
                 eventListId, newTitle, newStartDate, newEndDate, newIsAllDay, taskIds, newDescription
         );
 
@@ -1245,9 +1267,9 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         Event existingEvent = createEvent(eventList, "Original Title", "Original Description");
         String accessToken = createJwtToken(user);
 
-        String requestJson = createUpdateEventRequestJson(
+        String requestJson = createEventRequestJson(
                 eventList.getId(), "Updated Title",
-                startDate, endDate, isAllDay, null
+                startDate, endDate, isAllDay, null, "Updated Description"
         );
 
         // WHEN & THEN
@@ -1270,11 +1292,11 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         String accessToken = createJwtToken(user);
         Long nonExistentEventId = getNonExistentEventId();
 
-        String requestJson = createUpdateEventRequestJson(
+        String requestJson = createEventRequestJson(
                 eventList.getId(), "Updated Title",
                 TEST_START_DATE.format(DATE_TIME_FORMATTER),
                 TEST_END_DATE.format(DATE_TIME_FORMATTER),
-                false, null
+                false, null, "Updated Description"
         );
 
         // WHEN & THEN
@@ -1302,11 +1324,11 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         EventList otherUserEventList = createEventList(otherUser, DEFAULT_EVENTLIST_NAME);
         String otherUserToken = createJwtToken(otherUser);
 
-        String requestJson = createUpdateEventRequestJson(
+        String requestJson = createEventRequestJson(
                 otherUserEventList.getId(), "Updated Title",
                 TEST_START_DATE.format(DATE_TIME_FORMATTER),
                 TEST_END_DATE.format(DATE_TIME_FORMATTER),
-                false, null
+                false, null, "Updated Description"
         );
 
         // WHEN & THEN
@@ -1331,11 +1353,11 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         String accessToken = createJwtToken(user);
         Long nonExistentEventListId = getNonExistentEventListId();
 
-        String requestJson = createUpdateEventRequestJson(
+        String requestJson = createEventRequestJson(
                 nonExistentEventListId, "Updated Title",
                 TEST_START_DATE.format(DATE_TIME_FORMATTER),
                 TEST_END_DATE.format(DATE_TIME_FORMATTER),
-                false, null
+                false, null, "Updated Description"
         );
 
         // WHEN & THEN
@@ -1363,11 +1385,11 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         EventList otherUserEventList = createEventList(otherUser, DEFAULT_EVENTLIST_NAME);
         String ownerToken = createJwtToken(eventOwner);
 
-        String requestJson = createUpdateEventRequestJson(
+        String requestJson = createEventRequestJson(
                 otherUserEventList.getId(), "Updated Title", // 다른 사용자의 EventList 사용
                 TEST_START_DATE.format(DATE_TIME_FORMATTER),
                 TEST_END_DATE.format(DATE_TIME_FORMATTER),
-                false, null
+                false, null, "Updated Description"
         );
 
         // WHEN & THEN
@@ -1392,11 +1414,11 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         String accessToken = createJwtToken(user);
         Long nonExistentTaskId = getNonExistentTaskId();
 
-        String requestJson = createUpdateEventRequestJson(
+        String requestJson = createEventRequestJson(
                 eventList.getId(), "Updated Title",
                 TEST_START_DATE.format(DATE_TIME_FORMATTER),
                 TEST_END_DATE.format(DATE_TIME_FORMATTER),
-                false, List.of(nonExistentTaskId)
+                false, List.of(nonExistentTaskId), "Updated Description"
         );
 
         // WHEN & THEN
@@ -1423,11 +1445,11 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         Task otherUserTask = createTask(otherUser);
         String ownerToken = createJwtToken(eventOwner);
 
-        String requestJson = createUpdateEventRequestJson(
+        String requestJson = createEventRequestJson(
                 ownerEventList.getId(), "Updated Title",
                 TEST_START_DATE.format(DATE_TIME_FORMATTER),
                 TEST_END_DATE.format(DATE_TIME_FORMATTER),
-                false, List.of(otherUserTask.getId()) // 다른 사용자의 Task 사용
+                false, List.of(otherUserTask.getId()), "Updated Description" // 다른 사용자의 Task 사용
         );
 
         // WHEN & THEN
@@ -1480,80 +1502,13 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         return eventRepository.save(savedEvent);
     }
 
-    private String createUpdateEventRequestJson(Long eventListId, String title,
-                                               String startDate, String endDate,
-                                               Boolean isAllDay, List<Long> taskIds) {
-        return createUpdateEventRequestJson(eventListId, title, startDate, endDate, isAllDay, taskIds, "Updated Description");
-    }
-
-    private String createUpdateEventRequestJson(Long eventListId, String title,
-                                               String startDate, String endDate,
-                                               Boolean isAllDay, List<Long> taskIds, String description) {
-        StringBuilder json = new StringBuilder("{");
-        boolean needsComma = false;
-
-        if (eventListId != null) {
-            json.append("\"eventListId\":").append(eventListId);
-            needsComma = true;
-        }
-        if (title != null) {
-            if (needsComma) json.append(",");
-            json.append("\"title\":\"").append(title).append("\"");
-            needsComma = true;
-        }
-        
-        // eventDateTime 객체로 중첩 구조 생성
-        boolean hasEventDateTime = (startDate != null || endDate != null || isAllDay != null);
-        if (hasEventDateTime) {
-            if (needsComma) json.append(",");
-            json.append("\"eventDateTime\":{");
-            if (startDate != null) {
-                json.append("\"startDate\":\"").append(startDate).append("\",");
-            }
-            if (endDate != null) {
-                json.append("\"endDate\":\"").append(endDate).append("\",");
-            }
-            if (isAllDay != null) {
-                json.append("\"isAllDay\":").append(isAllDay);
-            } else {
-                // 마지막 콤마 제거가 필요한 경우
-                if (json.charAt(json.length() - 1) == ',') {
-                    json.setLength(json.length() - 1);
-                }
-            }
-            json.append("}");
-            needsComma = true;
-        }
-        
-        if (description != null) {
-            if (needsComma) json.append(",");
-            json.append("\"description\":\"").append(description).append("\"");
-            needsComma = true;
-        }
-
-        if (taskIds != null) {
-            if (needsComma) json.append(",");
-            json.append("\"tasks\":[");
-            if (!taskIds.isEmpty()) {
-                json.append(taskIds.stream().map(String::valueOf).reduce((a, b) -> a + "," + b).orElse(""));
-            }
-            json.append("]");
-        }
-
-        json.append("}");
-        return json.toString();
-    }
-
+    // 부분 업데이트용 헬퍼 메서드
     private String createPartialUpdateEventRequestJson(String fieldName, String fieldValue) {
-        StringBuilder json = new StringBuilder("{");
-        
         if ("title".equals(fieldName)) {
-            json.append("\"title\":\"").append(fieldValue).append("\"");
+            return createEventRequestJson(null, fieldValue, null, null, null, null, null);
         } else if ("description".equals(fieldName)) {
-            json.append("\"description\":\"").append(fieldValue).append("\"");
+            return createEventRequestJson(null, null, null, null, null, null, fieldValue);
         }
-        
-        json.append("}");
-        return json.toString();
+        return "{}";
     }
 }
