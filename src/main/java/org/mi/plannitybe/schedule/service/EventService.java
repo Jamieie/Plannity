@@ -3,7 +3,6 @@ package org.mi.plannitybe.schedule.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.mi.plannitybe.exception.*;
-import org.mi.plannitybe.schedule.domain.EventDateTime;
 import org.mi.plannitybe.schedule.dto.CreateEventRequest;
 import org.mi.plannitybe.schedule.dto.EventCalendarResponse;
 import org.mi.plannitybe.schedule.dto.EventResponse;
@@ -12,6 +11,7 @@ import org.mi.plannitybe.schedule.entity.Event;
 import org.mi.plannitybe.schedule.entity.EventList;
 import org.mi.plannitybe.schedule.entity.EventTask;
 import org.mi.plannitybe.schedule.entity.Task;
+import org.mi.plannitybe.schedule.mapper.EventMapper;
 import org.mi.plannitybe.schedule.repository.EventListRepository;
 import org.mi.plannitybe.schedule.repository.EventRepository;
 import org.mi.plannitybe.schedule.repository.TaskRepository;
@@ -20,7 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -40,16 +39,17 @@ public class EventService {
     public EventResponse createEvent(CreateEventRequest createEventRequest, String userId) {
 
         // createEventRequest의 eventListId 유효성 검증 - 존재 여부 및 소유자 일치 여부
-        EventList eventList = eventListRepository.findById(createEventRequest.getEventListId()).orElseThrow(
-                () -> new EventListNotFoundException(userId, createEventRequest.getEventListId()));
+        EventList eventList = eventListRepository.findById(createEventRequest.eventListId()).orElseThrow(
+                () -> new EventListNotFoundException(userId, createEventRequest.eventListId()));
         if (!userId.equals(eventList.getUser().getId())) {
-            throw new EventListAccessDeniedException(userId, createEventRequest.getEventListId());
+            throw new EventListAccessDeniedException(userId, createEventRequest.eventListId());
         }
 
-        // 4. tasks에 값이 존재하면 각각의 task는 존재하는 task여야 한다.
+        // tasks에 값이 존재할 경우, task 유효성 검증
         List<Task> tasks = new ArrayList<>();
-        if (!createEventRequest.getTaskIds().isEmpty()) {
-            for (Long taskId : createEventRequest.getTaskIds()) {
+        if (!createEventRequest.taskIds().isEmpty()) {
+            for (Long taskId : createEventRequest.taskIds()) {
+                // task 존재 여부 확인
                 Task task = taskRepository.findById(taskId).orElseThrow(() ->
                         new TaskNotFoundException(userId, taskId));
                 // task의 소유자와 일정 생성 시도하는 사용자가 동일한지 확인
@@ -61,65 +61,31 @@ public class EventService {
             }
         }
 
-        // 5. 위 값으로 Event를 생성한다.
-        EventDateTime eventDateTime = createEventRequest.getEventDateTime();
-        Event event = Event.builder()
-                .eventList(eventList)
-                .title(createEventRequest.getTitle())
-                .startDate(eventDateTime.getStartDate())
-                .endDate(eventDateTime.getEndDate())
-                .isAllDay(eventDateTime.getIsAllDay())
-                .description(createEventRequest.getDescription())
-                .build();
+        Event event = EventMapper.toEntity(createEventRequest, eventList);  // Event entity 생성
+        tasks.forEach(event::addTask);  // event에 task 연관관계 맺어줌
+        Event save = eventRepository.save(event);  // event 저장 (영속성 전이 설정으로 eventTask도 함께 저장)
 
-        // 6. event와 Task의 관계를 맺어준다.
-        tasks.forEach(event::addTask);
-
-        // 7. event를 저장한다. -> 영속성 전이 설정으로 eventTask도 함께 저장된다.
-        Event save = eventRepository.save(event);
-        return EventResponse.builder()
-                .id(save.getId())
-                .eventListId(save.getEventList().getId())
-                .title(save.getTitle())
-                .eventDateTime(save.getEventDateTime())
-                .description(save.getDescription())
-                .taskIds(
-                        save.getEventTasks().stream()
-                                .map(EventTask::getTask)
-                                .map(Task::getId)
-                                .collect(Collectors.toList()))
-                .build();
+        return EventMapper.toResponse(save);
     }
 
+    // user의 event 단건 상세 조회 메소드
     public EventResponse getEvent(Long eventId, String userId) {
-        // 1. eventId로 event 조회 -> 없으면 예외
-        Event event = eventRepository.findById(eventId).orElseThrow(
+        // 조회 요청한 eventId 유효성 검증
+        Event event = eventRepository.findById(eventId).orElseThrow(  // event 존재 여부
                 () -> new EventNotFoundException(userId, eventId));
-
-        // 2. 조회한 event의 소유자와 로그인한 user가 동일한지 확인 -> 불일치면 예외
-        if (!event.getEventList().getUser().getId().equals(userId)) {
+        if (!event.getEventList().getUser().getId().equals(userId)) {  // event 소유자 일치 여부
             throw new EventAccessDeniedException(userId, eventId);
         }
 
-        // 3. 위 조건 모두 충족하면 조회한 Event 반환
-        return EventResponse.builder()
-                .id(event.getId())
-                .eventListId(event.getEventList().getId())
-                .title(event.getTitle())
-                .eventDateTime(event.getEventDateTime())
-                .description(event.getDescription())
-                .taskIds(
-                        event.getEventTasks().stream()
-                                .map(EventTask::getTask)
-                                .map(Task::getId)
-                                .collect(Collectors.toList()))
-                .build();
+        return EventMapper.toResponse(event);  // 조회한 event 내용 반환
     }
 
+    // user 소유 event 목록 조회 - 캘린더 화면용
     public List<EventCalendarResponse> getEventsForCalendar(LocalDateTime from, LocalDateTime to, String userId) {
         return eventRepository.findEventsByUserIdAndDateRange(userId, from, to);
     }
 
+    // user의 event 업데이트 메소드
     @Transactional
     public EventResponse updateEvent(Long eventId, UpdateEventRequest updateEventRequest, String userId) {
 
@@ -131,7 +97,7 @@ public class EventService {
         }
 
         // 변경 요청한 eventListId의 유효성 검사
-        Long requestEventListId = updateEventRequest.getEventListId();
+        Long requestEventListId = updateEventRequest.eventListId();
         if (requestEventListId != null) {
             EventList eventList = eventListRepository.findById(requestEventListId).orElseThrow(  // eventList 존재하지 않으면 예외 발생
                     () -> new EventListNotFoundException(userId, requestEventListId));
@@ -141,12 +107,12 @@ public class EventService {
             event.updateEventList(eventList);  // eventList 업데이트
         }
 
-        event.updateTitle(updateEventRequest.getTitle());  // title 업데이트
-        event.updateFromEventDateTime(updateEventRequest.getEventDateTime());  // eventDateTime 업데이트
-        event.updateDescription(updateEventRequest.getDescription());  // description 업데이트
+        event.updateTitle(updateEventRequest.title());  // title 업데이트
+        event.updateFromEventDateTime(updateEventRequest.eventDateTime());  // eventDateTime 업데이트
+        event.updateDescription(updateEventRequest.description());  // description 업데이트
 
         // 변경 요청한 taskId의 유효성 검사 후 업데이트
-        List<Long> requestTaskIds = updateEventRequest.getTaskIds();
+        List<Long> requestTaskIds = updateEventRequest.taskIds();
         if (requestTaskIds != null) {
             List<Task> newTasks = new ArrayList<>();
             for (Long taskId : requestTaskIds) {
@@ -180,17 +146,6 @@ public class EventService {
 
         Event save = eventRepository.saveAndFlush(event);  // 더티 체킹 하지만 명시적으로 저장 수행
 
-        return EventResponse.builder()
-                .id(save.getId())
-                .eventListId(save.getEventList().getId())
-                .title(save.getTitle())
-                .eventDateTime(save.getEventDateTime())
-                .description(save.getDescription())
-                .taskIds(
-                        save.getEventTasks().stream()
-                                .map(EventTask::getTask)
-                                .map(Task::getId)
-                                .collect(Collectors.toList()))
-                .build();
+        return EventMapper.toResponse(event);
     }
 }

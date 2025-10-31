@@ -244,7 +244,7 @@ class EventServiceTest {
 
         // THEN
         assertThat(event).isNotNull();
-        assertThat(event.getId()).isEqualTo(eventId);
+        assertThat(event.id()).isEqualTo(eventId);
     }
 
     @Test
