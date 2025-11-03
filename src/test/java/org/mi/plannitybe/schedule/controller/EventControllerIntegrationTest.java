@@ -40,6 +40,7 @@ import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -447,7 +448,8 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"invalidEventId", "one", "-", "9223372036854775808"})  // 9223372036854775808 = Long의 최대값 + 1
+    @ValueSource(strings = {"invalidEventId", "one", "-", "9223372036854775808"})
+    // 9223372036854775808 = Long의 최대값 + 1
     @DisplayName("getEvent 실패 - 유효하지 않은 데이터 타입의 eventId로 일정 조회 시 응답")
     public void getEvent_invalidTypeEventId(String invalidEventId) throws Exception {
         // GIVEN - 사용자 생성
@@ -665,7 +667,7 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
             "'경계값 - from과 같은 시작시간', '2024-04-01T00:00:00', '2024-04-01T02:00:00', 'Event Starts At From', '2024-04-29T22:00:00', '2024-04-30T00:00:00', 'Event Ends At To'"
     })
     @DisplayName("getEventsForCalendar 성공 - 날짜 범위 내 일정 조회")
-    void getEventsForCalendar_success(String testDescription, 
+    void getEventsForCalendar_success(String testDescription,
                                       String event1Start, String event1End, String event1Title,
                                       String event2Start, String event2End, String event2Title) throws Exception {
         // GIVEN - 사용자, EventList 생성
@@ -674,7 +676,7 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         String accessToken = createJwtToken(user);
 
         // 이벤트 생성
-        Event event1 = createEventWithDates(eventList, event1Title, 
+        Event event1 = createEventWithDates(eventList, event1Title,
                 LocalDateTime.parse(event1Start),
                 LocalDateTime.parse(event1End));
         Event event2 = createEventWithDates(eventList, event2Title,
@@ -708,7 +710,7 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         String accessToken = createJwtToken(user);
 
         // 정렬 테스트를 위해 늦은 시간부터 생성
-        Event eventLater = createEventWithDates(eventList, "Event Later", 
+        Event eventLater = createEventWithDates(eventList, "Event Later",
                 LocalDateTime.of(2024, 4, 20, 14, 0),
                 LocalDateTime.of(2024, 4, 20, 16, 0));
         Event eventMiddle = createEventWithDates(eventList, "Event Middle",
@@ -838,9 +840,9 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
             "'to 파라미터 누락', 'from', '2024-04-01T00:00:00', 'to'"
     })
     @DisplayName("getEventsForCalendar 실패 - 필수 파라미터 누락")
-    void getEventsForCalendar_fail_missingRequiredParameter(String testDescription, 
-                                                           String paramName, String paramValue, 
-                                                           String expectedMissingField) throws Exception {
+    void getEventsForCalendar_fail_missingRequiredParameter(String testDescription,
+                                                            String paramName, String paramValue,
+                                                            String expectedMissingField) throws Exception {
         // GIVEN
         User user = createTestUser();
         String accessToken = createJwtToken(user);
@@ -1088,9 +1090,9 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
             "'eventDateTime만 수정', false, , , '2024-03-01T00:00:00', '2024-03-02T00:00:00', true, false"
     })
     @DisplayName("updateEvent 성공 - 필드별 수정")
-    void updateEvent_success_fieldUpdates(String testDescription, boolean updateAll, String newTitle, 
-                                         String newDescription, String newStartDate, String newEndDate, 
-                                         Boolean newIsAllDay, boolean updateTasks) throws Exception {
+    void updateEvent_success_fieldUpdates(String testDescription, boolean updateAll, String newTitle,
+                                          String newDescription, String newStartDate, String newEndDate,
+                                          Boolean newIsAllDay, boolean updateTasks) throws Exception {
         // GIVEN - 기존 Event 생성
         User user = createTestUser();
         EventList oldEventList = createEventList(user, "Old EventList");
@@ -1111,7 +1113,7 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
         // 요청 JSON 생성
         Long eventListId = updateAll ? newEventList.getId() : null;
         List<Long> taskIds = updateTasks ? List.of(newTask.getId()) : null;
-        
+
         String requestJson = createEventRequestJson(
                 eventListId, newTitle, newStartDate, newEndDate, newIsAllDay, taskIds, newDescription
         );
@@ -1320,7 +1322,7 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
 
         EventList ownerEventList = createEventList(eventOwner, DEFAULT_EVENTLIST_NAME);
         Event ownerEvent = createEvent(ownerEventList, "Owner's Event", "Owner's Description");
-        
+
         EventList otherUserEventList = createEventList(otherUser, DEFAULT_EVENTLIST_NAME);
         String otherUserToken = createJwtToken(otherUser);
 
@@ -1381,7 +1383,7 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
 
         EventList ownerEventList = createEventList(eventOwner, DEFAULT_EVENTLIST_NAME);
         Event ownerEvent = createEvent(ownerEventList, "Owner's Event", "Owner's Description");
-        
+
         EventList otherUserEventList = createEventList(otherUser, DEFAULT_EVENTLIST_NAME);
         String ownerToken = createJwtToken(eventOwner);
 
@@ -1486,9 +1488,9 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
                 .isAllDay(false)
                 .description(DEFAULT_DESCRIPTION)
                 .build();
-        
+
         Event savedEvent = eventRepository.save(event);
-        
+
         // EventTask 연결 생성 (실제 서비스 로직처럼)
         for (Long taskId : taskIds) {
             Task task = taskRepository.findById(taskId).orElseThrow();
@@ -1498,7 +1500,7 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
                     .build();
             savedEvent.getEventTasks().add(eventTask);
         }
-        
+
         return eventRepository.save(savedEvent);
     }
 
@@ -1510,5 +1512,209 @@ class EventControllerIntegrationTest extends BaseIntegrationTest {
             return createEventRequestJson(null, null, null, null, null, null, fieldValue);
         }
         return "{}";
+    }
+
+    // ================ deleteEvent 테스트 ================
+
+    @Test
+    @DisplayName("일정을 삭제를 성공하면 성공 응답을 반환한다.")
+    void deleteEvent_success() throws Exception {
+        // GIVEN - 사용자와 이벤트 생성
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        Event event = createEvent(eventList, DEFAULT_EVENT_TITLE, DEFAULT_DESCRIPTION);
+        String accessToken = createJwtToken(user);
+
+        // WHEN - DELETE /events/{id} 호출
+        mockMvc.perform(delete("/events/{id}", event.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                // THEN - 성공 응답 검증
+                .andExpect(status().isOk())
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.message").value("일정이 삭제되었습니다."));
+    }
+
+    @Test
+    @DisplayName("일정을 삭제 성공 후 조회하면 NOT_FOUND 응답을 반환한다.")
+    void deleteEvent_success_eventNotFoundAfterDeletion() throws Exception {
+        // GIVEN - 사용자와 이벤트 생성
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        Event event = createEvent(eventList, DEFAULT_EVENT_TITLE, DEFAULT_DESCRIPTION);
+        String accessToken = createJwtToken(user);
+
+        // WHEN - 이벤트 삭제
+        mockMvc.perform(delete("/events/{id}", event.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        // THEN - 삭제된 이벤트 조회 시 NOT_FOUND 응답
+        mockMvc.perform(get("/events/{id}", event.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("일정이 존재하지 않습니다."));
+    }
+
+    @Test
+    @DisplayName("일정 삭제 성공 후 캘린더뷰로 조회하면 해당 일정이 조회되지 않는다.")
+    void deleteEvent_success_notVisibleInCalendarAfterDeletion() throws Exception {
+        // GIVEN - 사용자와 이벤트 생성
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        Event event = createEventWithDates(eventList, DEFAULT_EVENT_TITLE,
+                LocalDateTime.of(2024, 4, 15, 10, 0),
+                LocalDateTime.of(2024, 4, 15, 12, 0));
+        String accessToken = createJwtToken(user);
+
+        // 삭제 전 캘린더 조회로 이벤트 존재 확인
+        mockMvc.perform(get("/events")
+                        .param("from", DEFAULT_FROM_DATE)
+                        .param("to", DEFAULT_TO_DATE)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        // WHEN - 이벤트 삭제
+        mockMvc.perform(delete("/events/{id}", event.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        // THEN - 캘린더 조회 시 이벤트가 조회되지 않음
+        mockMvc.perform(get("/events")
+                        .param("from", DEFAULT_FROM_DATE)
+                        .param("to", DEFAULT_TO_DATE)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("일정을 성공적으로 삭제하면 해당 일정만 삭제되고 나머지는 존재해야 한다.")
+    void deleteEvent_success_onlyTargetEventDeleted() throws Exception {
+        // GIVEN - 사용자와 여러 이벤트 생성
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        Event event1 = createEventWithDates(eventList, "Event 1",
+                LocalDateTime.of(2024, 4, 10, 10, 0),
+                LocalDateTime.of(2024, 4, 10, 12, 0));
+        Event event2 = createEventWithDates(eventList, "Event 2",
+                LocalDateTime.of(2024, 4, 15, 10, 0),
+                LocalDateTime.of(2024, 4, 15, 12, 0));
+        Event event3 = createEventWithDates(eventList, "Event 3",
+                LocalDateTime.of(2024, 4, 20, 10, 0),
+                LocalDateTime.of(2024, 4, 20, 12, 0));
+        String accessToken = createJwtToken(user);
+
+        // 삭제 전 이벤트 3개 존재 확인
+        mockMvc.perform(get("/events")
+                        .param("from", DEFAULT_FROM_DATE)
+                        .param("to", DEFAULT_TO_DATE)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3));
+
+        // WHEN - 중간 이벤트(event2) 삭제
+        mockMvc.perform(delete("/events/{id}", event2.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk());
+
+        // THEN - 나머지 2개 이벤트는 여전히 존재
+        mockMvc.perform(get("/events")
+                        .param("from", DEFAULT_FROM_DATE)
+                        .param("to", DEFAULT_TO_DATE)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].eventId").value(event1.getId()))
+                .andExpect(jsonPath("$[0].title").value("Event 1"))
+                .andExpect(jsonPath("$[1].eventId").value(event3.getId()))
+                .andExpect(jsonPath("$[1].title").value("Event 3"));
+    }
+
+    @Test
+    @DisplayName("일정을 성공적으로 삭제하면 연관된 eventTask도 함께 삭제된다.(Task는 존재해야 함)")
+    void deleteEvent_success_cascadesEventTaskDeletion() throws Exception {
+        // GIVEN - 사용자, 태스크가 연결된 이벤트 생성
+        User user = createTestUser();
+        EventList eventList = createEventList(user, DEFAULT_EVENTLIST_NAME);
+        Task task1 = createTask(user);
+        Task task2 = createTask(user);
+        Event event = createEventWithTasks(eventList, DEFAULT_EVENT_TITLE, List.of(task1.getId(), task2.getId()));
+        String accessToken = createJwtToken(user);
+
+        // EventTask 연결 확인
+        mockMvc.perform(get("/events/{id}", event.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskIds.length()").value(2));
+
+        // WHEN - 이벤트 삭제
+        mockMvc.perform(delete("/events/{id}", event.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isOk());
+
+        // THEN - 이벤트 삭제로 EventTask도 삭제되어 조회 불가
+        mockMvc.perform(get("/events/{id}", event.getId())
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isNotFound());
+
+        // TODO) Task는 여전히 존재해야 함 (Task API 개발 후 검증 추가)
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 일정으로 삭제 요청하면 NOT_FOUND 응답을 반환한다.")
+    void deleteEvent_fail_nonExistentEvent() throws Exception {
+        // GIVEN - 사용자 생성
+        User user = createTestUser();
+        String accessToken = createJwtToken(user);
+        Long nonExistentEventId = getNonExistentEventId();
+
+        // WHEN & THEN - 존재하지 않는 이벤트 삭제 시 NOT_FOUND
+        mockMvc.perform(delete("/events/{id}", nonExistentEventId)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("일정이 존재하지 않습니다."));
+    }
+
+    @Test
+    @DisplayName("소유자가 다른 일정을 삭제 요청하면 ACCESS_DENIED 예외가 발생하지만 NOT_FOUND 응답을 반환한다.")
+    void deleteEvent_fail_unauthorizedUser() throws Exception {
+        // GIVEN - 두 명의 사용자 생성
+        User eventOwner = createTestUser();
+        User otherUser = createTestUser();
+
+        EventList ownerEventList = createEventList(eventOwner, DEFAULT_EVENTLIST_NAME);
+        Event ownerEvent = createEvent(ownerEventList, DEFAULT_EVENT_TITLE, DEFAULT_DESCRIPTION);
+        String otherUserToken = createJwtToken(otherUser);
+
+        // WHEN & THEN - 다른 사용자가 이벤트 삭제 시도 시 NOT_FOUND (보안상 존재 여부 노출 안함)
+        mockMvc.perform(delete("/events/{id}", ownerEvent.getId())
+                        .header("Authorization", "Bearer " + otherUserToken)
+                        .accept(MediaType.APPLICATION_JSON))
+                .andDo(print())
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("EVENT_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value("일정이 존재하지 않습니다."));
     }
 }

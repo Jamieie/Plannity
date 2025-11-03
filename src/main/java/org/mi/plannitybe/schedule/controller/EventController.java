@@ -67,4 +67,14 @@ public class EventController {
                 "message", "일정이 수정되었습니다."
         ));
     }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteEvent(@PathVariable("id") @Min(1) Long eventId,
+                                         @AuthenticationPrincipal CustomUserDetails userDetails) {
+        String userId = userDetails.getId();
+        eventService.deleteEvent(eventId, userId);
+        return ResponseEntity.ok(Map.of(
+                "message", "일정이 삭제되었습니다."
+        ));
+    }
 }

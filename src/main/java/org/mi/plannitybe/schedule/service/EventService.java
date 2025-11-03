@@ -148,4 +148,17 @@ public class EventService {
 
         return EventMapper.toResponse(event);
     }
+
+    @Transactional
+    public void deleteEvent(Long eventId, String userId) {
+        // eventId 유효성 검사 - 존재여부 및 소유자 검증
+        Event event = eventRepository.findById(eventId).orElseThrow(
+                () -> new EventNotFoundException(userId, eventId)
+        );
+        if (!event.getEventList().getUser().getId().equals(userId)) {
+            throw new EventAccessDeniedException(userId, eventId);
+        }
+
+        eventRepository.delete(event);
+    }
 }
